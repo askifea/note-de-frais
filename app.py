@@ -59,20 +59,19 @@ if submitted:
             f.write(uploaded_file.getbuffer())
 
         # Save Expense Entry
-        st.session_state.expense_data.append({
+        new_expense = {
             "Date": expense_date.strftime("%Y-%m-%d"),
             "Fournisseur": supplier,
             "Objet": object_desc,
             "Type": expense_type,
             "Montant (€)": amount,
             "Justificatif": uploaded_file.name
-        })
+        }
 
-        # Save File Reference
+        st.session_state.expense_data.append(new_expense)
         st.session_state.uploaded_files[uploaded_file.name] = file_path
 
         st.success("🎉 Dépense ajoutée avec succès!")
-        st.experimental_rerun()
 
 # Display Expenses Table
 if st.session_state.expense_data:
