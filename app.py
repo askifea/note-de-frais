@@ -1,98 +1,100 @@
 import streamlit as st
 import pandas as pd
-import re
-from pdfminer.high_level import extract_text
+import os
 
-# Debugging Function to Print PDF Text
-def debug_print_pdf(pdf_text):
-    st.write("### Extracted PDF Text (First 500 Characters)")
-    st.write(pdf_text[:500])
+# Set Page Config
+st.set_page_config(page_title="Note de Frais", page_icon="💼", layout="wide")
+st.title("📝 Note de Frais - Gestion des Dépenses")
 
-# Function to Extract Invoice Data
-def extract_invoice_data(pdf_text, filename):
-    pages = pdf_text.split('\x0c')  # Split text by pages
-    data = []
+# Sidebar for User Information
+st.sidebar.header("Informations Utilisateur")
+user_name = st.sidebar.text_input("👤 Nom")
+user_company = st.sidebar.text_input("🏢 Entreprise")
 
-    for page_number, page_text in enumerate(pages, start=1):
-        # Debug: Show Extracted Text from Each Page
-        debug_print_pdf(page_text)
+# Initialize Session State for Expense Data
+if "expense_data" not in st.session_state:
+    st.session_state.expense_data = []
 
-        # Extract fields using regex
-        invoice_dates = re.findall(r"Date:\s*(\d{2}/\d{2}/\d{4})", page_text)
-        amounts = re.findall(r"Total\s*:\s*([\d,.]+)", page_text)
-        suppliers = re.findall(r"Supplier:\s*(.+)", page_text)
-        descriptions = re.findall(r"Description:\s*(.+)", page_text)
-
-        for i in range(max(len(invoice_dates), len(amounts), len(suppliers), len(descriptions))):
-            data.append({
-                "Numéro de page": page_number,
-                "Date de la facture": invoice_dates[i] if i < len(invoice_dates) else None,
-                "Montant": amounts[i] if i < len(amounts) else None,
-                "Fournisseur": suppliers[i] if i < len(suppliers) else None,
-                "Désignation": descriptions[i] if i < len(descriptions) else None,
-                "Nom du fichier": filename
-            })
-    
-    return pd.DataFrame(data)
-
-# Streamlit App Setup
-st.set_page_config(page_title="Note de Frais", page_icon="📄", layout="wide")
-st.title("Note de Frais - Gestion des Factures")
-
-st.markdown("### Téléchargez des factures en PDF pour extraction et édition.")
-
-# Initialize session state
+# Initialize Session State for Uploaded Files
 if "uploaded_files" not in st.session_state:
     st.session_state.uploaded_files = {}
-if "extracted_data" not in st.session_state:
-    st.session_state.extracted_data = pd.DataFrame()
 
-# User Information Input
-st.sidebar.header("Informations de l'Utilisateur")
-user_name = st.sidebar.text_input("Votre Nom")
-user_company = st.sidebar.text_input("Votre Entreprise")
+# Define Expense Categories
+expense_categories = [
+    "Restaurant Bill", "Gas Bill", "Transportation Bill",
+    "Ticket", "Indemnité Kilométrique", "Miscellaneous"
+]
 
-# File uploader
-uploaded_files = st.file_uploader("Téléchargez vos factures (PDF)", type="pdf", accept_multiple_files=True)
+st.markdown("## 📅 Ajoutez vos Dépenses")
 
-# Process uploaded files
-if uploaded_files:
-    for uploaded_file in uploaded_files:
-        if uploaded_file.name not in st.session_state.uploaded_files:
-            st.write(f"📂 **Processing file:** {uploaded_file.name}")  # Debugging line
-            pdf_text = extract_text(uploaded_file)
-            
-            if not pdf_text.strip():
-                st.error(f"🚨 Erreur : Impossible d'extraire du texte du fichier `{uploaded_file.name}`")
-            else:
-                invoice_data = extract_invoice_data(pdf_text, uploaded_file.name)
-                st.session_state.uploaded_files[uploaded_file.name] = uploaded_file
-                st.session_state.extracted_data = pd.concat(
-                    [st.session_state.extracted_data, invoice_data], ignore_index=True
-                )
+# Expense Entry Form
+with st.form(key="expense_form"):
+    col1, col2, col3 = st.columns(3)
 
-# Display extracted invoice data and allow user to edit
-if not st.session_state.extracted_data.empty:
-    st.markdown("### Modifier les Données des Factures")
-    edited_data = st.data_editor(st.session_state.extracted_data, num_rows="dynamic")
+    with col1:
+        expense_date = st.date_input("📆 Date de Dépense")
+        supplier = st.text_input("🏪 Fournisseur")
 
-    # Save updated data
-    if st.button("✅ Sauvegarder les Modifications"):
-        st.session_state.extracted_data = edited_data
-        st.success("✔️ Données mises à jour avec succès!")
+    with col2:
+        object_desc = st.text_input("📝 Objet (Description)")
+        expense_type = st.selectbox("📌 Type de Dépense", expense_categories)
 
-    # Download updated data
-    st.markdown("### 📥 Télécharger les Données des Factures")
-    output_file = "Factures_Modifiées.xlsx"
-    st.session_state.extracted_data.to_excel(output_file, index=False)
-    
+    with col3:
+        amount = st.number_input("💰 Montant (€)", min_value=0.0, format="%.2f")
+        uploaded_file = st.file_uploader("📄 Joindre un Justificatif", type=["pdf", "jpg", "png"])
+
+    submitted = st.form_submit_button("✅ Ajouter Dépense")
+
+# Process Submission
+if submitted:
+    if not user_name or not user_company:
+        st.warning("⚠️ Veuillez entrer votre nom et votre entreprise avant d'ajouter une dépense.")
+    elif not expense_date or not supplier or not object_desc or not amount or not uploaded_file:
+        st.warning("⚠️ Veuillez remplir tous les champs et téléverser un justificatif.")
+    else:
+        # Save File
+        file_path = f"uploads/{uploaded_file.name}"
+        os.makedirs("uploads", exist_ok=True)
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+
+        # Save Expense Entry
+        st.session_state.expense_data.append({
+            "Date": expense_date.strftime("%Y-%m-%d"),
+            "Fournisseur": supplier,
+            "Objet": object_desc,
+            "Type": expense_type,
+            "Montant (€)": amount,
+            "Justificatif": uploaded_file.name
+        })
+
+        # Save File Reference
+        st.session_state.uploaded_files[uploaded_file.name] = file_path
+
+        st.success("🎉 Dépense ajoutée avec succès!")
+        st.experimental_rerun()
+
+# Display Expenses Table
+if st.session_state.expense_data:
+    st.markdown("## 📋 Liste des Dépenses")
+
+    df_expenses = pd.DataFrame(st.session_state.expense_data)
+    edited_df = st.data_editor(df_expenses, num_rows="dynamic")
+
+    # Save Updates
+    if st.button("💾 Sauvegarder Modifications"):
+        st.session_state.expense_data = edited_df.to_dict(orient="records")
+        st.success("✅ Modifications enregistrées!")
+
+    # Download Excel
+    st.markdown("### 📥 Télécharger le Fichier Excel")
+    output_file = "Note_de_Frais.xlsx"
+    df_expenses.to_excel(output_file, index=False)
+
     with open(output_file, "rb") as file:
         st.download_button(
-            label="💾 Télécharger les Factures Modifiées",
+            label="💾 Télécharger Note de Frais",
             data=file,
-            file_name="Factures_Modifiées.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            file_name="Note_de_Frais.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-else:
-    st.info("📌 **Aucune donnée extraite.** Veuillez télécharger des fichiers PDF pour voir les résultats.")
-
