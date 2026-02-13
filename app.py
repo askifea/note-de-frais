@@ -435,60 +435,49 @@ def generate_expense_pdf(
     story.append(tbl)
     story.append(Spacer(1, 8 * mm))
 
-    # ── Bloc signatures (avec signature manuscrite si disponible) ─────────────
-    SIG_W, SIG_H = 60*mm, 20*mm   # taille de l'image de signature dans la cellule
-
-    def _sig_cell():
-        """Retourne le contenu de la cellule 'Le bénéficiaire' avec la signature si dispo."""
-        items = [_p("Le bénéficiaire", _hdr)]
-        if signature_b64:
-            try:
-                sig_bytes = base64.b64decode(signature_b64)
-                # Trim transparent margins for a cleaner look
-                pil_sig   = PILImage.open(io.BytesIO(sig_bytes)).convert("RGBA")
-                # Flatten onto white background
-                bg = PILImage.new("RGBA", pil_sig.size, (255, 255, 255, 255))
-                bg.paste(pil_sig, mask=pil_sig.split()[3])
-                flat = bg.convert("RGB")
-                flat_buf = io.BytesIO()
-                flat.save(flat_buf, format="PNG")
-                flat_buf.seek(0)
-                sig_img = RLImage(flat_buf, width=SIG_W, height=SIG_H)
-                items.append(sig_img)
-            except Exception:
-                items.append(_p(""))
-        else:
-            items.append(_p(""))   # espace vide pour signer à la main
-        items.append(_p(f"Date : {date.today().strftime('%d/%m/%Y')}", _cel))
-        return items
-
-    def _empty_sig_cell(label: str):
-        return [_p(label, _hdr), _p(""), _p("Date :")]
-
-    # Build signature table rows
-    row0 = [_sig_cell(), _empty_sig_cell("La direction"), _empty_sig_cell("La comptabilité")]
-
-    # Flatten into table data (each cell is a list of flowables → use nested Table trick)
-    def _cell_table(items):
-        inner = [[item] for item in items]
-        t = Table(inner, colWidths=[78*mm])
-        t.setStyle(TableStyle([
-            ("ALIGN",   (0, 0), (-1, -1), "CENTER"),
-            ("VALIGN",  (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING",   (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
-        ]))
-        return t
-
-    sig_row = [[_cell_table(row0[0]), _cell_table(row0[1]), _cell_table(row0[2])]]
-    sig = Table(sig_row, colWidths=[80*mm, 80*mm, 80*mm])
-    sig.setStyle(TableStyle([
-        ("ALIGN",  (0, 0), (-1, -1), "CENTER"),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("GRID",   (0, 0), (-1, -1), 0.3, colors.HexColor("#BBBBBB")),
-        ("MINROWHEIGHT", (0, 0), (-1, -1), 28*mm),
+    # ── Bloc signatures avec image directe (plus simple et fiable) ────────────
+    sig_headers = [
+        _p("Le bénéficiaire", _hdr),
+        _p("La direction", _hdr),
+        _p("La comptabilité", _hdr),
+    ]
+    
+    # Ligne pour l'image de signature (uniquement colonne 1 si signature présente)
+    sig_images = []
+    if signature_b64:
+        try:
+            sig_bytes = base64.b64decode(signature_b64)
+            pil_sig = PILImage.open(io.BytesIO(sig_bytes)).convert("RGBA")
+            # Aplatir sur fond blanc
+            bg = PILImage.new("RGB", pil_sig.size, (255, 255, 255))
+            bg.paste(pil_sig, mask=pil_sig.split()[3] if pil_sig.mode == "RGBA" else None)
+            sig_buf = io.BytesIO()
+            bg.save(sig_buf, format="PNG")
+            sig_buf.seek(0)
+            sig_img = RLImage(sig_buf, width=55*mm, height=18*mm)
+            sig_images = [sig_img, _p(""), _p("")]
+        except Exception as e:
+            sig_images = [_p(""), _p(""), _p("")]
+    else:
+        sig_images = [_p(""), _p(""), _p("")]
+    
+    sig_dates = [
+        _p(f"Date : {date.today().strftime('%d/%m/%Y')}", _cel),
+        _p("Date :", _cel),
+        _p("Date :", _cel),
+    ]
+    
+    sig_data = [sig_headers, sig_images, sig_dates]
+    sig_table = Table(sig_data, colWidths=[80*mm, 80*mm, 80*mm])
+    sig_table.setStyle(TableStyle([
+        ("ALIGN",      (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN",     (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID",       (0, 0), (-1, -1), 0.3, colors.HexColor("#BBBBBB")),
+        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("ROWHEIGHT",     (0, 1), (-1, 1), 22*mm),  # row pour signature
     ]))
-    story.append(sig)
+    story.append(sig_table)
 
     doc.build(story)
     buf.seek(0)
@@ -621,6 +610,11 @@ if st.session_state.expense_data:
                 with st.spinner("Génération du PDF fusionné…"):
                     try:
                         df_exp = pd.DataFrame(st.session_state.expense_data)
+                        
+                        # Info signature
+                        if st.session_state.signature_b64:
+                            st.info("✍️ Signature manuscrite incluse dans le PDF")
+                        
                         st.session_state.pdf_bytes = generate_full_pdf(
                             df_exp, user_name, user_company, currency,
                             st.session_state.uploaded_files_data,
@@ -629,6 +623,8 @@ if st.session_state.expense_data:
                         st.session_state.show_download = True
                     except Exception as e:
                         st.error(f"Erreur PDF : {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
     with btn3:
         if st.button("🗑️ Tout effacer"):
             st.session_state.expense_data        = []
