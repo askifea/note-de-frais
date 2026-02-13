@@ -101,196 +101,134 @@ currency_label = st.sidebar.selectbox(
 )
 currency = CURRENCIES[currency_label]
 
-# ─── Signature manuscrite (sidebar) ───────────────────────────────────────────
-st.sidebar.markdown("---")
-st.sidebar.markdown("### ✍️ Signature")
-st.sidebar.caption("Signez dans le cadre ci-dessous (stylet ou souris)")
+# ─── Composant signature (declare_component – protocole officiel Streamlit) ────
+import os, tempfile
 
-SIGNATURE_HTML = """
+_SIGNATURE_COMPONENT_HTML = """<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: transparent; font-family: sans-serif; }
-  #wrap { display: flex; flex-direction: column; gap: 6px; }
-  #sig-canvas {
-    width: 100%;
-    height: 130px;
-    background: #fff;
-    border: 1.5px solid #ccc;
-    border-radius: 6px;
-    cursor: crosshair;
-    touch-action: none;
-    display: block;
-  }
-  #sig-canvas.signed { border-color: #2d6a4f; }
-  .btn-row { display: flex; gap: 6px; }
-  button {
-    flex: 1;
-    padding: 5px 8px;
-    border: none;
-    border-radius: 5px;
-    font-size: 12px;
-    cursor: pointer;
-    font-weight: 600;
-  }
-  #btn-save { background: #2d6a4f; color: #fff; }
-  #btn-clear { background: #eee; color: #333; }
-  #status { font-size: 11px; color: #555; min-height: 16px; text-align: center; }
-  #status.ok { color: #2d6a4f; font-weight: 600; }
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:sans-serif;background:transparent;padding:4px;}
+#c{
+  display:block;width:100%;height:150px;
+  background:#fff;border:1.5px solid #ccc;border-radius:6px;
+  cursor:crosshair;touch-action:none;
+}
+#c.signed{border-color:#1f6f3b;box-shadow:0 0 0 2px #d4edda;}
+.btns{display:flex;gap:6px;margin-top:6px;}
+button{
+  flex:1;padding:6px 8px;border:none;border-radius:5px;
+  font-size:12px;font-weight:700;cursor:pointer;
+}
+#ok {background:#1f6f3b;color:#fff;}
+#ok:hover{background:#155229;}
+#cl {background:#e9ecef;color:#333;}
+#cl:hover{background:#dee2e6;}
+#msg{font-size:11px;text-align:center;margin-top:5px;min-height:15px;color:#666;}
+#msg.ok {color:#1f6f3b;font-weight:600;}
+#msg.err{color:#c0392b;}
 </style>
-<div id="wrap">
-  <canvas id="sig-canvas" width="280" height="130"></canvas>
-  <div class="btn-row">
-    <button id="btn-save">✅ Valider</button>
-    <button id="btn-clear">🗑 Effacer</button>
-  </div>
-  <div id="status">Signez puis cliquez sur Valider</div>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="btns">
+  <button id="ok">✅ Valider</button>
+  <button id="cl">🗑 Effacer</button>
 </div>
-<script>
-(function() {
-  const canvas  = document.getElementById('sig-canvas');
-  const ctx     = canvas.getContext('2d');
-  const status  = document.getElementById('status');
-  let drawing   = false;
-  let hasMark   = false;
+<div id="msg">Signez ci-dessus puis cliquez sur Valider</div>
 
-  // Hi-DPI support
-  function resize() {
-    const rect = canvas.getBoundingClientRect();
-    const ratio = window.devicePixelRatio || 1;
-    canvas.width  = rect.width  * ratio;
-    canvas.height = rect.height * ratio;
-    ctx.scale(ratio, ratio);
-    ctx.lineWidth   = 2.2;
+<script src="./streamlit-component-lib.js"></script>
+<script>
+(function(){
+  const canvas = document.getElementById('c');
+  const ctx    = canvas.getContext('2d');
+  const msg    = document.getElementById('msg');
+  let drawing  = false;
+  let hasMark  = false;
+
+  function setup(){
+    const r   = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width  = r.width  * dpr;
+    canvas.height = r.height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.lineWidth   = 2.5;
     ctx.lineCap     = 'round';
     ctx.lineJoin    = 'round';
-    ctx.strokeStyle = '#1a1a1a';
+    ctx.strokeStyle = '#111';
   }
-  resize();
+  setup();
+  window.addEventListener('resize', setup);
 
-  function getPos(e) {
-    const rect = canvas.getBoundingClientRect();
-    const src  = e.touches ? e.touches[0] : e;
-    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+  function pos(e){
+    const r = canvas.getBoundingClientRect();
+    const s = e.touches ? e.touches[0] : e;
+    return { x: s.clientX - r.left, y: s.clientY - r.top };
   }
-
-  function start(e) {
+  function start(e){
     e.preventDefault();
-    drawing = true;
-    hasMark = true;
+    drawing = hasMark = true;
     canvas.classList.add('signed');
-    const p = getPos(e);
+    const p = pos(e);
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
   }
-  function move(e) {
-    if (!drawing) return;
+  function move(e){
+    if(!drawing) return;
     e.preventDefault();
-    const p = getPos(e);
+    const p = pos(e);
     ctx.lineTo(p.x, p.y);
     ctx.stroke();
   }
-  function stop(e) { drawing = false; }
+  function stop(){ drawing = false; }
 
   canvas.addEventListener('mousedown',  start);
   canvas.addEventListener('mousemove',  move);
   canvas.addEventListener('mouseup',    stop);
   canvas.addEventListener('mouseleave', stop);
-  canvas.addEventListener('touchstart', start, { passive: false });
-  canvas.addEventListener('touchmove',  move,  { passive: false });
+  canvas.addEventListener('touchstart', start, {passive:false});
+  canvas.addEventListener('touchmove',  move,  {passive:false});
   canvas.addEventListener('touchend',   stop);
 
-  document.getElementById('btn-clear').addEventListener('click', () => {
+  document.getElementById('cl').addEventListener('click', () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     hasMark = false;
     canvas.classList.remove('signed');
-    status.textContent = 'Signez puis cliquez sur Valider';
-    status.className   = '';
-    window.parent.postMessage({ type: 'signature', data: null }, '*');
+    msg.textContent = 'Signez ci-dessus puis cliquez sur Valider';
+    msg.className   = '';
+    Streamlit.setComponentValue(null);
   });
 
-  document.getElementById('btn-save').addEventListener('click', () => {
-    if (!hasMark) {
-      status.textContent = '⚠️ Veuillez signer avant de valider';
-      status.className   = '';
+  document.getElementById('ok').addEventListener('click', () => {
+    if(!hasMark){
+      msg.textContent = '⚠️ Dessinez votre signature d\'abord';
+      msg.className   = 'err';
       return;
     }
-    const dataUrl = canvas.toDataURL('image/png');
-    status.textContent = '✅ Signature enregistrée !';
-    status.className   = 'ok';
-    window.parent.postMessage({ type: 'signature', data: dataUrl }, '*');
+    const data = canvas.toDataURL('image/png');
+    msg.textContent = '✅ Signature enregistrée !';
+    msg.className   = 'ok';
+    Streamlit.setComponentValue(data);   // ← envoi direct à Python
   });
+
+  Streamlit.setFrameHeight(document.body.scrollHeight + 10);
 })();
 </script>
+</body>
+</html>
 """
 
-# Render the canvas component
-sig_component = components.html(SIGNATURE_HTML, height=195, scrolling=False)
+# Écrire le composant dans un dossier temporaire persistant
+_COMP_DIR = os.path.join(tempfile.gettempdir(), "ndf_sig_component_v1")
+os.makedirs(_COMP_DIR, exist_ok=True)
+_comp_index = os.path.join(_COMP_DIR, "index.html")
+if not os.path.exists(_comp_index):
+    with open(_comp_index, "w", encoding="utf-8") as _f:
+        _f.write(_SIGNATURE_COMPONENT_HTML)
 
-# Receiver: a tiny hidden JS that listens for postMessage and stores in Streamlit
-RECEIVER_HTML = """
-<script>
-window.addEventListener('message', function(e) {
-  if (e.data && e.data.type === 'signature') {
-    const val = e.data.data || '';
-    // Store in sessionStorage so Streamlit can read it on next interaction
-    window.sessionStorage.setItem('ndf_signature', val);
-    // Also set a flag in the URL hash to trigger Streamlit rerun (hack-free approach)
-  }
-}, false);
-</script>
-"""
-components.html(RECEIVER_HTML, height=0)
-
-# Signature capture button
-if st.sidebar.button("📥 Enregistrer la signature", use_container_width=True):
-    st.sidebar.info("Cliquez d'abord sur **Valider** dans le cadre de signature, puis ce bouton.")
-
-st.sidebar.caption("La signature apparaîtra dans le PDF exporté.")
-
-# Allow manual paste of base64 (hidden mechanism via text_area for JS bridge)
-_sig_input = st.sidebar.text_area(
-    "coller_signature",
-    value="",
-    height=1,
-    label_visibility="collapsed",
-    placeholder="data:image/png;base64,...",
-    key=f"sig_input_{st.session_state.form_key}",
-)
-if _sig_input and _sig_input.startswith("data:image/png;base64,"):
-    st.session_state.signature_b64 = _sig_input.split(",", 1)[1]
-    st.sidebar.success("✅ Signature enregistrée !")
-
-# JS bridge: auto-fill the text area when signature is validated
-BRIDGE_HTML = """
-<script>
-window.addEventListener('message', function(e) {
-  if (e.data && e.data.type === 'signature') {
-    const val = e.data.data || '';
-    // Find the hidden textarea (Streamlit renders them as <textarea>)
-    setTimeout(() => {
-      const areas = window.parent.document.querySelectorAll('textarea');
-      areas.forEach(ta => {
-        if (ta.placeholder === 'data:image/png;base64,...') {
-          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-            window.parent.HTMLTextAreaElement.prototype, 'value').set;
-          nativeInputValueSetter.call(ta, val);
-          ta.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-      });
-    }, 100);
-  }
-}, false);
-</script>
-"""
-components.html(BRIDGE_HTML, height=0)
-
-# Show signature preview if captured
-if st.session_state.signature_b64:
-    sig_preview_bytes = base64.b64decode(st.session_state.signature_b64)
-    st.sidebar.image(sig_preview_bytes, caption="Aperçu signature", use_container_width=True)
-    if st.sidebar.button("🗑️ Supprimer la signature"):
-        st.session_state.signature_b64 = None
-        st.rerun()
+_signature_pad = components.declare_component("signature_pad", path=_COMP_DIR)
 
 # ─── ReportLab styles ─────────────────────────────────────────────────────────
 _base = getSampleStyleSheet()
@@ -671,3 +609,32 @@ if st.session_state.expense_data:
         )
         st.dataframe(summary, use_container_width=True, hide_index=True)
         st.metric("💰 Total général TTC", f"{fmt_fr(df[amt_col].sum())} {currency}")
+
+# ─── Zone de signature (bas de page, toujours visible) ────────────────────────
+st.markdown("---")
+st.markdown("## ✍️ Signature du bénéficiaire")
+
+_sig_col, _prev_col = st.columns([2, 1])
+
+with _sig_col:
+    st.caption("Dessinez votre signature ci-dessous puis cliquez sur **Valider**. "
+               "Elle sera automatiquement intégrée dans le PDF.")
+    # Le composant retourne directement la data-URL PNG via Streamlit.setComponentValue()
+    _sig_result = _signature_pad(key="sig_pad_main")
+    if _sig_result and isinstance(_sig_result, str) and _sig_result.startswith("data:image/png;base64,"):
+        new_b64 = _sig_result.split(",", 1)[1]
+        if new_b64 != st.session_state.signature_b64:
+            st.session_state.signature_b64 = new_b64
+            st.rerun()
+    elif _sig_result is None and st.session_state.signature_b64 is not None:
+        # Effacement
+        st.session_state.signature_b64 = None
+        st.rerun()
+
+with _prev_col:
+    if st.session_state.signature_b64:
+        st.success("✅ Signature enregistrée")
+        sig_bytes = base64.b64decode(st.session_state.signature_b64)
+        st.image(sig_bytes, caption="Aperçu", use_container_width=True)
+    else:
+        st.info("Aucune signature pour l'instant.\nSignez à gauche pour l'ajouter au PDF.")
