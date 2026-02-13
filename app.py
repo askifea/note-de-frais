@@ -8,7 +8,9 @@ Nouveautés :
 
 import io
 import base64
+import json
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 from datetime import date
 from reportlab.lib.pagesizes import A4, landscape
@@ -85,6 +87,7 @@ for _k, _d in [
     ("form_key",            0),
     ("show_download",       False),
     ("pdf_bytes",           None),
+    ("signature_b64",       None),   # PNG base64 de la signature manuscrite
 ]:
     if _k not in st.session_state:
         st.session_state[_k] = _d
@@ -97,6 +100,197 @@ currency_label = st.sidebar.selectbox(
     "💱 Devise (montants TTC)", list(CURRENCIES.keys()), index=0
 )
 currency = CURRENCIES[currency_label]
+
+# ─── Signature manuscrite (sidebar) ───────────────────────────────────────────
+st.sidebar.markdown("---")
+st.sidebar.markdown("### ✍️ Signature")
+st.sidebar.caption("Signez dans le cadre ci-dessous (stylet ou souris)")
+
+SIGNATURE_HTML = """
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; font-family: sans-serif; }
+  #wrap { display: flex; flex-direction: column; gap: 6px; }
+  #sig-canvas {
+    width: 100%;
+    height: 130px;
+    background: #fff;
+    border: 1.5px solid #ccc;
+    border-radius: 6px;
+    cursor: crosshair;
+    touch-action: none;
+    display: block;
+  }
+  #sig-canvas.signed { border-color: #2d6a4f; }
+  .btn-row { display: flex; gap: 6px; }
+  button {
+    flex: 1;
+    padding: 5px 8px;
+    border: none;
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  #btn-save { background: #2d6a4f; color: #fff; }
+  #btn-clear { background: #eee; color: #333; }
+  #status { font-size: 11px; color: #555; min-height: 16px; text-align: center; }
+  #status.ok { color: #2d6a4f; font-weight: 600; }
+</style>
+<div id="wrap">
+  <canvas id="sig-canvas" width="280" height="130"></canvas>
+  <div class="btn-row">
+    <button id="btn-save">✅ Valider</button>
+    <button id="btn-clear">🗑 Effacer</button>
+  </div>
+  <div id="status">Signez puis cliquez sur Valider</div>
+</div>
+<script>
+(function() {
+  const canvas  = document.getElementById('sig-canvas');
+  const ctx     = canvas.getContext('2d');
+  const status  = document.getElementById('status');
+  let drawing   = false;
+  let hasMark   = false;
+
+  // Hi-DPI support
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width  = rect.width  * ratio;
+    canvas.height = rect.height * ratio;
+    ctx.scale(ratio, ratio);
+    ctx.lineWidth   = 2.2;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+    ctx.strokeStyle = '#1a1a1a';
+  }
+  resize();
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const src  = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+  }
+
+  function start(e) {
+    e.preventDefault();
+    drawing = true;
+    hasMark = true;
+    canvas.classList.add('signed');
+    const p = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+  }
+  function move(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    const p = getPos(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  }
+  function stop(e) { drawing = false; }
+
+  canvas.addEventListener('mousedown',  start);
+  canvas.addEventListener('mousemove',  move);
+  canvas.addEventListener('mouseup',    stop);
+  canvas.addEventListener('mouseleave', stop);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove',  move,  { passive: false });
+  canvas.addEventListener('touchend',   stop);
+
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    hasMark = false;
+    canvas.classList.remove('signed');
+    status.textContent = 'Signez puis cliquez sur Valider';
+    status.className   = '';
+    window.parent.postMessage({ type: 'signature', data: null }, '*');
+  });
+
+  document.getElementById('btn-save').addEventListener('click', () => {
+    if (!hasMark) {
+      status.textContent = '⚠️ Veuillez signer avant de valider';
+      status.className   = '';
+      return;
+    }
+    const dataUrl = canvas.toDataURL('image/png');
+    status.textContent = '✅ Signature enregistrée !';
+    status.className   = 'ok';
+    window.parent.postMessage({ type: 'signature', data: dataUrl }, '*');
+  });
+})();
+</script>
+"""
+
+# Render the canvas component
+sig_component = components.html(SIGNATURE_HTML, height=195, scrolling=False)
+
+# Receiver: a tiny hidden JS that listens for postMessage and stores in Streamlit
+RECEIVER_HTML = """
+<script>
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'signature') {
+    const val = e.data.data || '';
+    // Store in sessionStorage so Streamlit can read it on next interaction
+    window.sessionStorage.setItem('ndf_signature', val);
+    // Also set a flag in the URL hash to trigger Streamlit rerun (hack-free approach)
+  }
+}, false);
+</script>
+"""
+components.html(RECEIVER_HTML, height=0)
+
+# Signature capture button
+if st.sidebar.button("📥 Enregistrer la signature", use_container_width=True):
+    st.sidebar.info("Cliquez d'abord sur **Valider** dans le cadre de signature, puis ce bouton.")
+
+st.sidebar.caption("La signature apparaîtra dans le PDF exporté.")
+
+# Allow manual paste of base64 (hidden mechanism via text_area for JS bridge)
+_sig_input = st.sidebar.text_area(
+    "coller_signature",
+    value="",
+    height=1,
+    label_visibility="collapsed",
+    placeholder="data:image/png;base64,...",
+    key=f"sig_input_{st.session_state.form_key}",
+)
+if _sig_input and _sig_input.startswith("data:image/png;base64,"):
+    st.session_state.signature_b64 = _sig_input.split(",", 1)[1]
+    st.sidebar.success("✅ Signature enregistrée !")
+
+# JS bridge: auto-fill the text area when signature is validated
+BRIDGE_HTML = """
+<script>
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'signature') {
+    const val = e.data.data || '';
+    // Find the hidden textarea (Streamlit renders them as <textarea>)
+    setTimeout(() => {
+      const areas = window.parent.document.querySelectorAll('textarea');
+      areas.forEach(ta => {
+        if (ta.placeholder === 'data:image/png;base64,...') {
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            window.parent.HTMLTextAreaElement.prototype, 'value').set;
+          nativeInputValueSetter.call(ta, val);
+          ta.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+    }, 100);
+  }
+}, false);
+</script>
+"""
+components.html(BRIDGE_HTML, height=0)
+
+# Show signature preview if captured
+if st.session_state.signature_b64:
+    sig_preview_bytes = base64.b64decode(st.session_state.signature_b64)
+    st.sidebar.image(sig_preview_bytes, caption="Aperçu signature", use_container_width=True)
+    if st.sidebar.button("🗑️ Supprimer la signature"):
+        st.session_state.signature_b64 = None
+        st.rerun()
 
 # ─── ReportLab styles ─────────────────────────────────────────────────────────
 _base = getSampleStyleSheet()
@@ -170,7 +364,10 @@ def _build_header_story(story: list, company: str, name: str) -> None:
 
 
 # ─── Génération PDF ───────────────────────────────────────────────────────────
-def generate_expense_pdf(df: pd.DataFrame, name: str, company: str, cur: str) -> bytes:
+def generate_expense_pdf(
+    df: pd.DataFrame, name: str, company: str, cur: str,
+    signature_b64: str | None = None
+) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=landscape(A4),
@@ -247,17 +444,58 @@ def generate_expense_pdf(df: pd.DataFrame, name: str, company: str, cur: str) ->
     story.append(tbl)
     story.append(Spacer(1, 8 * mm))
 
-    # Bloc signatures
-    sig_data = [
-        [_p("Le bénéficiaire", _hdr), _p("La direction", _hdr), _p("La comptabilité", _hdr)],
-        [_p(""), _p(""), _p("")],
-        [_p("Date :"),  _p("Date :"),  _p("Date :")],
-    ]
-    sig = Table(sig_data, colWidths=[80*mm, 80*mm, 80*mm])
+    # ── Bloc signatures (avec signature manuscrite si disponible) ─────────────
+    SIG_W, SIG_H = 60*mm, 20*mm   # taille de l'image de signature dans la cellule
+
+    def _sig_cell():
+        """Retourne le contenu de la cellule 'Le bénéficiaire' avec la signature si dispo."""
+        items = [_p("Le bénéficiaire", _hdr)]
+        if signature_b64:
+            try:
+                sig_bytes = base64.b64decode(signature_b64)
+                # Trim transparent margins for a cleaner look
+                pil_sig   = PILImage.open(io.BytesIO(sig_bytes)).convert("RGBA")
+                # Flatten onto white background
+                bg = PILImage.new("RGBA", pil_sig.size, (255, 255, 255, 255))
+                bg.paste(pil_sig, mask=pil_sig.split()[3])
+                flat = bg.convert("RGB")
+                flat_buf = io.BytesIO()
+                flat.save(flat_buf, format="PNG")
+                flat_buf.seek(0)
+                sig_img = RLImage(flat_buf, width=SIG_W, height=SIG_H)
+                items.append(sig_img)
+            except Exception:
+                items.append(_p(""))
+        else:
+            items.append(_p(""))   # espace vide pour signer à la main
+        items.append(_p(f"Date : {date.today().strftime('%d/%m/%Y')}", _cel))
+        return items
+
+    def _empty_sig_cell(label: str):
+        return [_p(label, _hdr), _p(""), _p("Date :")]
+
+    # Build signature table rows
+    row0 = [_sig_cell(), _empty_sig_cell("La direction"), _empty_sig_cell("La comptabilité")]
+
+    # Flatten into table data (each cell is a list of flowables → use nested Table trick)
+    def _cell_table(items):
+        inner = [[item] for item in items]
+        t = Table(inner, colWidths=[78*mm])
+        t.setStyle(TableStyle([
+            ("ALIGN",   (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN",  (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",   (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
+        ]))
+        return t
+
+    sig_row = [[_cell_table(row0[0]), _cell_table(row0[1]), _cell_table(row0[2])]]
+    sig = Table(sig_row, colWidths=[80*mm, 80*mm, 80*mm])
     sig.setStyle(TableStyle([
-        ("ALIGN",      (0, 0), (-1, -1), "CENTER"),
-        ("TOPPADDING", (0, 1), (-1, 1),  22),
-        ("GRID",       (0, 0), (-1, -1), 0.3, colors.HexColor("#BBBBBB")),
+        ("ALIGN",  (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID",   (0, 0), (-1, -1), 0.3, colors.HexColor("#BBBBBB")),
+        ("MINROWHEIGHT", (0, 0), (-1, -1), 28*mm),
     ]))
     story.append(sig)
 
@@ -289,10 +527,12 @@ def _image_to_pdf_bytes(img_bytes: bytes) -> bytes:
     return buf.read()
 
 
-def generate_full_pdf(df, name, company, cur, uploaded_files):
+def generate_full_pdf(df, name, company, cur, uploaded_files, signature_b64=None):
     """PDF fusionné = récapitulatif + toutes les pièces jointes."""
     writer = PdfWriter()
-    for page in PdfReader(io.BytesIO(generate_expense_pdf(df, name, company, cur))).pages:
+    for page in PdfReader(io.BytesIO(
+        generate_expense_pdf(df, name, company, cur, signature_b64)
+    )).pages:
         writer.add_page(page)
     for _, fdata in uploaded_files.items():
         try:
@@ -393,6 +633,7 @@ if st.session_state.expense_data:
                         st.session_state.pdf_bytes = generate_full_pdf(
                             df_exp, user_name, user_company, currency,
                             st.session_state.uploaded_files_data,
+                            signature_b64=st.session_state.signature_b64,
                         )
                         st.session_state.show_download = True
                     except Exception as e:
