@@ -272,7 +272,8 @@ def generate_expense_pdf(
             sig_buf = io.BytesIO()
             bg.save(sig_buf, format="PNG")
             sig_buf.seek(0)
-            sig_img = RLImage(sig_buf, width=55*mm, height=18*mm)
+            # Taille plus grande pour signature bien visible (75mm × 25mm)
+            sig_img = RLImage(sig_buf, width=75*mm, height=25*mm)
             sig_images = [sig_img, _p(""), _p("")]
         except Exception as e:
             sig_images = [_p(""), _p(""), _p("")]
@@ -293,7 +294,7 @@ def generate_expense_pdf(
         ("GRID",       (0, 0), (-1, -1), 0.3, colors.HexColor("#BBBBBB")),
         ("TOPPADDING",    (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("ROWHEIGHT",     (0, 1), (-1, 1), 22*mm),  # row pour signature
+        ("ROWHEIGHT",     (0, 1), (-1, 1), 30*mm),  # Hauteur augmentée pour grande signature
     ]))
     story.append(sig_table)
 
@@ -415,13 +416,13 @@ if st.session_state.expense_data:
     df       = pd.DataFrame(st.session_state.expense_data)
     edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True)
 
-    btn1, btn2, btn3 = st.columns([1, 2, 1])
+    btn1, btn2, btn3 = st.columns([1, 3, 1])
     with btn1:
         if st.button("💾 Sauvegarder Modifications"):
             st.session_state.expense_data = edited_df.to_dict(orient="records")
             st.success("✅ Modifications enregistrées !")
     with btn2:
-        if st.button("📄 Générer la Note de Frais PDF", type="primary"):
+        if st.button("📄 Générer la Note de Frais PDF", type="primary", use_container_width=True):
             if not user_name.strip():
                 st.warning("⚠️ Veuillez saisir votre Nom dans la barre latérale.")
             else:
@@ -477,62 +478,73 @@ if st.session_state.expense_data:
         st.dataframe(summary, use_container_width=True, hide_index=True)
         st.metric("💰 Total général TTC", f"{fmt_fr(df[amt_col].sum())} {currency}")
 
-# ─── Fonction génération signature depuis initiales ──────────────────────────
+# ─── Fonction génération signature manuscrite stylisée ────────────────────────
 def generate_signature_from_name(name: str) -> bytes:
-    """Génère une image de signature stylisée à partir du nom complet."""
+    """Génère une signature manuscrite stylisée avec le nom complet en grand."""
     from PIL import ImageDraw, ImageFont
     
-    # Extraire initiales
-    parts = name.strip().split()
-    if len(parts) >= 2:
-        initials = parts[0][0].upper() + parts[-1][0].upper()
-    elif len(parts) == 1 and parts[0]:
-        initials = parts[0][0].upper()
-    else:
-        initials = "?"
+    # Nettoyer le nom
+    full_name = name.strip()
+    if not full_name:
+        full_name = "Signature"
     
-    # Créer image avec fond transparent
-    width, height = 400, 120
+    # Dimensions généreuses pour une belle signature
+    width, height = 800, 250
     img = PILImage.new('RGBA', (width, height), (255, 255, 255, 0))
     draw = ImageDraw.Draw(img)
     
-    # Charger fonte (italic pour effet manuscrit)
+    # Charger fonte cursive/italique pour effet manuscrit
+    font = None
+    font_size = 90  # Grande taille pour signature imposante
+    
     try:
+        # Essayer les fontes cursives disponibles sur le système
         font_paths = [
-            '/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf',
-            '/usr/share/fonts/truetype/dejavu/DejaVuSerif-Italic.ttf',
+            ('/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf', 90),
+            ('/usr/share/fonts/truetype/dejavu/DejaVuSerif-Italic.ttf', 90),
+            ('/usr/share/fonts/truetype/liberation/LiberationSans-Italic.ttf', 85),
         ]
-        font = None
-        for path in font_paths:
+        
+        for font_path, size in font_paths:
             try:
-                font = ImageFont.truetype(path, 70)
+                font = ImageFont.truetype(font_path, size)
+                font_size = size
                 break
             except Exception:
                 pass
+        
         if font is None:
-            # Fallback : taille plus grande pour fonte par défaut
+            # Fallback : fonte par défaut en grande taille
             font = ImageFont.load_default()
+            font_size = 40
     except Exception:
         font = ImageFont.load_default()
+        font_size = 40
     
-    # Calculer position centrée
-    bbox = draw.textbbox((0, 0), initials, font=font)
+    # Calculer position pour centrer le nom
+    bbox = draw.textbbox((0, 0), full_name, font=font)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
+    
+    # Centrer horizontalement et verticalement
     x = (width - text_width) // 2
-    y = (height - text_height) // 2 - 10
+    y = (height - text_height) // 2 - 20
     
-    # Dessiner initiales en noir
-    draw.text((x, y), initials, fill=(25, 25, 25, 255), font=font)
+    # Dessiner le nom complet en noir/gris très foncé (couleur encre)
+    draw.text((x, y), full_name, fill=(15, 15, 15, 255), font=font)
     
-    # Ligne décorative sous les initiales (paraphe)
-    line_y = y + text_height + 8
-    line_start = max(20, x - 15)
-    line_end = min(width - 20, x + text_width + 15)
+    # Ajouter un paraphe élégant sous la signature
+    line_y = y + text_height + 15
+    line_start = max(50, x - 30)
+    line_end = min(width - 50, x + text_width + 30)
+    
+    # Double ligne pour effet plus sophistiqué
     draw.line([(line_start, line_y), (line_end, line_y)], 
-              fill=(25, 25, 25, 255), width=3)
+              fill=(15, 15, 15, 255), width=3)
+    draw.line([(line_start + 10, line_y + 6), (line_end - 10, line_y + 6)], 
+              fill=(15, 15, 15, 200), width=2)
     
-    # Convertir en PNG bytes
+    # Convertir en PNG
     buf = io.BytesIO()
     img.save(buf, format='PNG')
     buf.seek(0)
@@ -547,7 +559,7 @@ st.caption("Choisissez votre méthode de signature :")
 
 signature_method = st.radio(
     "Méthode de signature",
-    ["📝 Initiales automatiques", "📤 Importer une image", "📧 Confirmation par email"],
+    ["✍️ Signature manuscrite stylisée", "📤 Importer une image"],
     horizontal=True,
     label_visibility="collapsed",
 )
@@ -555,21 +567,11 @@ signature_method = st.radio(
 _sig_col, _prev_col = st.columns([2, 1])
 
 with _sig_col:
-    if signature_method == "📝 Initiales automatiques":
-        st.info("💡 Vos initiales seront générées automatiquement à partir de votre nom "
-                "et stylisées pour créer une signature élégante.")
-        
-        if st.button("✅ Générer ma signature", type="primary", use_container_width=True):
-            if not user_name.strip():
-                st.warning("⚠️ Veuillez d'abord saisir votre nom dans la barre latérale.")
-            else:
-                sig_bytes = generate_signature_from_name(user_name)
-                st.session_state.signature_b64 = base64.b64encode(sig_bytes).decode()
-                st.success(f"✅ Signature générée pour : **{user_name}**")
-                st.rerun()
+    if signature_method == "✍️ Signature manuscrite stylisée":
+        st.info("💡 Votre nom complet sera stylisé en signature manuscrite élégante avec paraphe.")
     
-    elif signature_method == "📤 Importer une image":
-        st.caption("Importez une photo/scan de votre signature (PNG, JPG)")
+    else:  # Importer une image
+        st.caption("Importez une photo ou scan de votre signature manuscrite (PNG, JPG)")
         
         signature_file = st.file_uploader(
             "Choisir fichier signature",
@@ -585,42 +587,6 @@ with _sig_col:
             if sig_b64 != st.session_state.signature_b64:
                 st.session_state.signature_b64 = sig_b64
                 st.success("✅ Signature importée avec succès !")
-    
-    else:  # Confirmation par email
-        st.info("💡 Un lien de confirmation sera envoyé à votre adresse email. "
-                "En cliquant sur ce lien, vous validerez électroniquement la note de frais.")
-        
-        email = st.text_input("📧 Votre adresse email", key="sig_email")
-        
-        if st.button("📨 Envoyer le lien de confirmation", type="primary", use_container_width=True):
-            if not email or "@" not in email:
-                st.warning("⚠️ Veuillez saisir une adresse email valide.")
-            else:
-                # Générer un token simple (timestamp + hash du nom)
-                import hashlib
-                import time
-                token = hashlib.sha256(
-                    f"{user_name}{email}{time.time()}".encode()
-                ).hexdigest()[:16]
-                
-                # En production, ici on enverrait un vrai email
-                # Pour la démo, on affiche le lien
-                st.success(f"✅ Email envoyé à **{email}**")
-                st.info(f"**Lien de confirmation** (en production, envoyé par email):\n\n"
-                        f"`https://votre-app.com/confirm/{token}`\n\n"
-                        f"Ce lien vaudra signature électronique du document.")
-                
-                # Créer une signature visuelle "Signé électroniquement"
-                img = PILImage.new('RGBA', (400, 120), (255, 255, 255, 0))
-                draw = ImageDraw.Draw(img)
-                
-                text = f"Signé électroniquement\n{email}\n{date.today().strftime('%d/%m/%Y')}"
-                draw.text((20, 20), text, fill=(25, 25, 25, 255))
-                
-                buf = io.BytesIO()
-                img.save(buf, format='PNG')
-                st.session_state.signature_b64 = base64.b64encode(buf.getvalue()).decode()
-                st.rerun()
 
 with _prev_col:
     if st.session_state.signature_b64:
@@ -632,3 +598,20 @@ with _prev_col:
             st.rerun()
     else:
         st.info("Aucune signature active.\n\nChoisissez une méthode à gauche.")
+
+# ─── Bouton génération signature (si méthode manuscrite) ──────────────────────
+if signature_method == "✍️ Signature manuscrite stylisée":
+    st.markdown("###")  # Petit espace
+    
+    # Centrer le bouton avec des colonnes
+    _, btn_col, _ = st.columns([1, 2, 1])
+    
+    with btn_col:
+        if st.button("✅ Générer ma signature manuscrite", type="primary", use_container_width=True):
+            if not user_name.strip():
+                st.warning("⚠️ Veuillez d'abord saisir votre nom dans la barre latérale.")
+            else:
+                sig_bytes = generate_signature_from_name(user_name)
+                st.session_state.signature_b64 = base64.b64encode(sig_bytes).decode()
+                st.success(f"✅ Signature générée pour : **{user_name}**")
+                st.rerun()
