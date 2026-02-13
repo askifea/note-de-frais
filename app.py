@@ -272,8 +272,9 @@ def generate_expense_pdf(
             sig_buf = io.BytesIO()
             bg.save(sig_buf, format="PNG")
             sig_buf.seek(0)
-            # Taille plus grande pour signature bien visible (75mm × 25mm)
-            sig_img = RLImage(sig_buf, width=75*mm, height=25*mm)
+            # FORCER la signature à remplir toute la cellule (sans conserver le ratio)
+            # La cellule fait 80mm de large, on utilise presque toute la largeur
+            sig_img = RLImage(sig_buf, width=78*mm, height=28*mm)
             sig_images = [sig_img, _p(""), _p("")]
         except Exception as e:
             sig_images = [_p(""), _p(""), _p("")]
@@ -433,7 +434,7 @@ if st.session_state.expense_data:
 
 # ─── Fonction génération signature manuscrite stylisée ────────────────────────
 def generate_signature_from_name(name: str) -> bytes:
-    """Génère une signature manuscrite stylisée avec le nom complet (taille 9pt comme nom société)."""
+    """Génère une signature manuscrite stylisée GRANDE avec le nom complet."""
     from PIL import ImageDraw, ImageFont
     
     # Nettoyer le nom
@@ -441,23 +442,26 @@ def generate_signature_from_name(name: str) -> bytes:
     if not full_name:
         full_name = "Signature"
     
-    # Dimensions pour signature imposante
-    width, height = 800, 250
+    # Dimensions pour signature très imposante
+    width, height = 1200, 400
     img = PILImage.new('RGBA', (width, height), (255, 255, 255, 0))
     draw = ImageDraw.Draw(img)
     
-    # Taille 9pt comme le nom de société dans le PDF
-    # 9pt ≈ 12px à 96dpi, mais pour une belle signature on augmente proportionnellement
-    # ReportLab PDF: 9pt → Équivalent image: ~110px pour être lisible
-    font_size_target = 110  # Équivalent visuel de 9pt en grande résolution
+    # Taille TRÈS GRANDE pour être visible dans le PDF
+    # On veut que la signature remplisse vraiment l'espace
+    font_size_target = 180  # Beaucoup plus grand
     
-    # Charger fonte cursive élégante (priorité aux sérif italiques qui ressemblent à Freestyle Script)
+    # Essayer différentes fontes cursives/élégantes
     font = None
     font_paths_to_try = [
+        # Serif Bold Italic (le plus proche d'une signature élégante)
         ('/usr/share/fonts/truetype/liberation/LiberationSerif-BoldItalic.ttf', font_size_target),
         ('/usr/share/fonts/truetype/dejavu/DejaVuSerif-BoldItalic.ttf', font_size_target),
-        ('/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf', font_size_target + 10),
-        ('/usr/share/fonts/truetype/dejavu/DejaVuSerif-Italic.ttf', font_size_target + 10),
+        # Fallback: Serif Italic normal
+        ('/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf', font_size_target + 20),
+        ('/usr/share/fonts/truetype/dejavu/DejaVuSerif-Italic.ttf', font_size_target + 20),
+        # Autres options cursives disponibles
+        ('/usr/share/fonts/truetype/google-fonts/Lora-Italic-Variable.ttf', font_size_target),
     ]
     
     for font_path, size in font_paths_to_try:
@@ -468,27 +472,33 @@ def generate_signature_from_name(name: str) -> bytes:
             pass
     
     if font is None:
-        # Fallback
-        font = ImageFont.load_default()
+        # Fallback avec taille maximale
+        try:
+            font = ImageFont.load_default()
+        except:
+            font = ImageFont.load_default()
     
     # Calculer position centrée
     bbox = draw.textbbox((0, 0), full_name, font=font)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
     x = (width - text_width) // 2
-    y = (height - text_height) // 2 - 20
+    y = (height - text_height) // 2 - 30
     
     # Dessiner en noir encre
-    draw.text((x, y), full_name, fill=(15, 15, 15, 255), font=font)
+    draw.text((x, y), full_name, fill=(10, 10, 10, 255), font=font)
     
-    # Double paraphe élégant
-    line_y = y + text_height + 18
-    line_start = max(50, x - 30)
-    line_end = min(width - 50, x + text_width + 30)
+    # Paraphe élégant sous la signature (lignes plus épaisses)
+    line_y = y + text_height + 25
+    line_start = max(60, x - 40)
+    line_end = min(width - 60, x + text_width + 40)
+    
+    # Ligne principale épaisse
     draw.line([(line_start, line_y), (line_end, line_y)], 
-              fill=(15, 15, 15, 255), width=4)
-    draw.line([(line_start + 15, line_y + 8), (line_end - 15, line_y + 8)], 
-              fill=(15, 15, 15, 180), width=2)
+              fill=(10, 10, 10, 255), width=6)
+    # Ligne secondaire plus fine
+    draw.line([(line_start + 20, line_y + 12), (line_end - 20, line_y + 12)], 
+              fill=(10, 10, 10, 200), width=3)
     
     # Convertir en PNG
     buf = io.BytesIO()
