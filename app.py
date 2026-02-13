@@ -101,134 +101,187 @@ currency_label = st.sidebar.selectbox(
 )
 currency = CURRENCIES[currency_label]
 
-# ─── Composant signature (declare_component – protocole officiel Streamlit) ────
-import os, tempfile
-
-_SIGNATURE_COMPONENT_HTML = """<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:sans-serif;background:transparent;padding:4px;}
-#c{
-  display:block;width:100%;height:150px;
-  background:#fff;border:1.5px solid #ccc;border-radius:6px;
-  cursor:crosshair;touch-action:none;
-}
-#c.signed{border-color:#1f6f3b;box-shadow:0 0 0 2px #d4edda;}
-.btns{display:flex;gap:6px;margin-top:6px;}
-button{
-  flex:1;padding:6px 8px;border:none;border-radius:5px;
-  font-size:12px;font-weight:700;cursor:pointer;
-}
-#ok {background:#1f6f3b;color:#fff;}
-#ok:hover{background:#155229;}
-#cl {background:#e9ecef;color:#333;}
-#cl:hover{background:#dee2e6;}
-#msg{font-size:11px;text-align:center;margin-top:5px;min-height:15px;color:#666;}
-#msg.ok {color:#1f6f3b;font-weight:600;}
-#msg.err{color:#c0392b;}
-</style>
-</head>
-<body>
-<canvas id="c"></canvas>
-<div class="btns">
-  <button id="ok">✅ Valider</button>
-  <button id="cl">🗑 Effacer</button>
-</div>
-<div id="msg">Signez ci-dessus puis cliquez sur Valider</div>
-
-<script src="./streamlit-component-lib.js"></script>
-<script>
-(function(){
-  const canvas = document.getElementById('c');
-  const ctx    = canvas.getContext('2d');
-  const msg    = document.getElementById('msg');
-  let drawing  = false;
-  let hasMark  = false;
-
-  function setup(){
-    const r   = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width  = r.width  * dpr;
-    canvas.height = r.height * dpr;
-    ctx.scale(dpr, dpr);
-    ctx.lineWidth   = 2.5;
-    ctx.lineCap     = 'round';
-    ctx.lineJoin    = 'round';
-    ctx.strokeStyle = '#111';
-  }
-  setup();
-  window.addEventListener('resize', setup);
-
-  function pos(e){
-    const r = canvas.getBoundingClientRect();
-    const s = e.touches ? e.touches[0] : e;
-    return { x: s.clientX - r.left, y: s.clientY - r.top };
-  }
-  function start(e){
-    e.preventDefault();
-    drawing = hasMark = true;
-    canvas.classList.add('signed');
-    const p = pos(e);
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-  }
-  function move(e){
-    if(!drawing) return;
-    e.preventDefault();
-    const p = pos(e);
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-  }
-  function stop(){ drawing = false; }
-
-  canvas.addEventListener('mousedown',  start);
-  canvas.addEventListener('mousemove',  move);
-  canvas.addEventListener('mouseup',    stop);
-  canvas.addEventListener('mouseleave', stop);
-  canvas.addEventListener('touchstart', start, {passive:false});
-  canvas.addEventListener('touchmove',  move,  {passive:false});
-  canvas.addEventListener('touchend',   stop);
-
-  document.getElementById('cl').addEventListener('click', () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    hasMark = false;
-    canvas.classList.remove('signed');
-    msg.textContent = 'Signez ci-dessus puis cliquez sur Valider';
-    msg.className   = '';
-    Streamlit.setComponentValue(null);
-  });
-
-  document.getElementById('ok').addEventListener('click', () => {
-    if(!hasMark){
-      msg.textContent = '⚠️ Dessinez votre signature d\'abord';
-      msg.className   = 'err';
-      return;
+# ─── Composant signature (canvas HTML5 pur avec stockage manuel) ──────────────
+def render_signature_canvas():
+    """Affiche un canvas de signature. Utilise session_state pour la communication."""
+    
+    html_code = """
+    <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: transparent;
+        padding: 10px;
     }
-    const data = canvas.toDataURL('image/png');
-    msg.textContent = '✅ Signature enregistrée !';
-    msg.className   = 'ok';
-    Streamlit.setComponentValue(data);   // ← envoi direct à Python
-  });
-
-  Streamlit.setFrameHeight(document.body.scrollHeight + 10);
-})();
-</script>
-</body>
-</html>
-"""
-
-# Écrire le composant dans un dossier temporaire persistant
-_COMP_DIR = os.path.join(tempfile.gettempdir(), "ndf_sig_component_v1")
-os.makedirs(_COMP_DIR, exist_ok=True)
-_comp_index = os.path.join(_COMP_DIR, "index.html")
-if not os.path.exists(_comp_index):
-    with open(_comp_index, "w", encoding="utf-8") as _f:
-        _f.write(_SIGNATURE_COMPONENT_HTML)
-
-_signature_pad = components.declare_component("signature_pad", path=_COMP_DIR)
+    #signatureCanvas {
+        display: block;
+        width: 100%;
+        height: 160px;
+        background: white;
+        border: 2px solid #d1d5db;
+        border-radius: 8px;
+        cursor: crosshair;
+        touch-action: none;
+    }
+    #signatureCanvas.has-signature {
+        border-color: #10b981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+    .button-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+    }
+    button {
+        flex: 1;
+        padding: 10px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    #validateBtn {
+        background: #10b981;
+        color: white;
+    }
+    #validateBtn:hover {
+        background: #059669;
+    }
+    #clearBtn {
+        background: #f3f4f6;
+        color: #374151;
+    }
+    #clearBtn:hover {
+        background: #e5e7eb;
+    }
+    #message {
+        text-align: center;
+        margin-top: 10px;
+        font-size: 13px;
+        color: #6b7280;
+        min-height: 20px;
+        font-weight: 500;
+    }
+    #message.success { color: #10b981; }
+    #message.error { color: #ef4444; }
+    </style>
+    
+    <canvas id="signatureCanvas"></canvas>
+    <div class="button-group">
+        <button id="validateBtn">✅ Valider la signature</button>
+        <button id="clearBtn">🗑 Effacer</button>
+    </div>
+    <div id="message">Dessinez votre signature ci-dessus</div>
+    
+    <script>
+    (function() {
+        const canvas = document.getElementById('signatureCanvas');
+        const ctx = canvas.getContext('2d');
+        const message = document.getElementById('message');
+        let isDrawing = false;
+        let hasSignature = false;
+        
+        // Configuration du canvas avec support Hi-DPI
+        function setupCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#1f2937';
+        }
+        setupCanvas();
+        window.addEventListener('resize', setupCanvas);
+        
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const source = e.touches ? e.touches[0] : e;
+            return {
+                x: source.clientX - rect.left,
+                y: source.clientY - rect.top
+            };
+        }
+        
+        function startDrawing(e) {
+            e.preventDefault();
+            isDrawing = true;
+            hasSignature = true;
+            canvas.classList.add('has-signature');
+            const pos = getMousePos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        }
+        
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const pos = getMousePos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        }
+        
+        function stopDrawing() {
+            isDrawing = false;
+        }
+        
+        // Event listeners pour souris
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', stopDrawing);
+        
+        // Event listeners pour tactile
+        canvas.addEventListener('touchstart', startDrawing, { passive: false });
+        canvas.addEventListener('touchmove', draw, { passive: false });
+        canvas.addEventListener('touchend', stopDrawing);
+        
+        // Bouton Effacer
+        document.getElementById('clearBtn').addEventListener('click', function() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            hasSignature = false;
+            canvas.classList.remove('has-signature');
+            message.textContent = 'Dessinez votre signature ci-dessus';
+            message.className = '';
+            
+            // Envoyer signal d'effacement au parent
+            if (window.parent) {
+                window.parent.postMessage({
+                    type: 'streamlit:signature',
+                    data: null
+                }, '*');
+            }
+        });
+        
+        // Bouton Valider
+        document.getElementById('validateBtn').addEventListener('click', function() {
+            if (!hasSignature) {
+                message.textContent = '⚠️ Veuillez dessiner une signature d\\'abord';
+                message.className = 'error';
+                return;
+            }
+            
+            const dataURL = canvas.toDataURL('image/png');
+            message.textContent = '✅ Signature enregistrée !';
+            message.className = 'success';
+            
+            // Envoyer au parent via postMessage
+            if (window.parent) {
+                window.parent.postMessage({
+                    type: 'streamlit:signature',
+                    data: dataURL
+                }, '*');
+            }
+        });
+    })();
+    </script>
+    """
+    
+    components.html(html_code, height=250, scrolling=False)
 
 # ─── ReportLab styles ─────────────────────────────────────────────────────────
 _base = getSampleStyleSheet()
@@ -617,24 +670,63 @@ st.markdown("## ✍️ Signature du bénéficiaire")
 _sig_col, _prev_col = st.columns([2, 1])
 
 with _sig_col:
-    st.caption("Dessinez votre signature ci-dessous puis cliquez sur **Valider**. "
-               "Elle sera automatiquement intégrée dans le PDF.")
-    # Le composant retourne directement la data-URL PNG via Streamlit.setComponentValue()
-    _sig_result = _signature_pad(key="sig_pad_main")
-    if _sig_result and isinstance(_sig_result, str) and _sig_result.startswith("data:image/png;base64,"):
-        new_b64 = _sig_result.split(",", 1)[1]
-        if new_b64 != st.session_state.signature_b64:
-            st.session_state.signature_b64 = new_b64
-            st.rerun()
-    elif _sig_result is None and st.session_state.signature_b64 is not None:
-        # Effacement
-        st.session_state.signature_b64 = None
-        st.rerun()
+    st.caption("Dessinez votre signature ci-dessous puis cliquez sur **✅ Valider**.")
+    
+    # Rendu du canvas
+    render_signature_canvas()
+    
+    # Récepteur caché pour postMessage (bridge JS → Python)
+    _bridge_html = """
+    <script>
+    window.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'streamlit:signature') {
+            const signatureData = event.data.data;
+            
+            // Trouver le champ caché et y injecter la valeur
+            const inputs = window.parent.document.querySelectorAll('input[type="text"]');
+            inputs.forEach(function(input) {
+                if (input.getAttribute('aria-label') === '__sig_receiver__') {
+                    const nativeSetter = Object.getOwnPropertyDescriptor(
+                        window.parent.HTMLInputElement.prototype, 'value'
+                    ).set;
+                    nativeSetter.call(input, signatureData || '');
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            });
+        }
+    }, false);
+    </script>
+    """
+    components.html(_bridge_html, height=0)
+    
+    # Champ caché pour recevoir la signature via le bridge
+    _sig_data = st.text_input(
+        "__sig_receiver__",
+        value="",
+        key=f"sig_receiver_{st.session_state.form_key}",
+        label_visibility="collapsed",
+    )
+    
+    # Traitement de la signature reçue
+    if _sig_data:
+        if _sig_data.startswith("data:image/png;base64,"):
+            new_b64 = _sig_data.split(",", 1)[1]
+            if new_b64 != st.session_state.signature_b64:
+                st.session_state.signature_b64 = new_b64
+                st.rerun()
+        elif _sig_data == "null" or not _sig_data:
+            # Effacement
+            if st.session_state.signature_b64 is not None:
+                st.session_state.signature_b64 = None
+                st.rerun()
 
 with _prev_col:
     if st.session_state.signature_b64:
         st.success("✅ Signature enregistrée")
         sig_bytes = base64.b64decode(st.session_state.signature_b64)
         st.image(sig_bytes, caption="Aperçu", use_container_width=True)
+        if st.button("🗑 Supprimer", key="delete_sig", use_container_width=True):
+            st.session_state.signature_b64 = None
+            st.rerun()
     else:
-        st.info("Aucune signature pour l'instant.\nSignez à gauche pour l'ajouter au PDF.")
+        st.info("Aucune signature.\nSignez à gauche puis cliquez sur **Valider**.")
