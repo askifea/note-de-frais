@@ -55,20 +55,20 @@ COMPANY_INFO = {
 
 COMPANIES          = list(COMPANY_INFO.keys())
 EXPENSE_CATEGORIES = [
-    "DIVERS",
     "RECEPTION-INVITATIONS-REPAS",
     "HOTEL-HEBERGEMENT",
     "TRANSPORT - CARBURANT",
     "TELEPHONE",
     "AFFRANCHISSEMENT",
+    "DIVERS",
 ]
 EXPENSE_LABELS = {
-    "DIVERS":                      "DIVERS",
     "RECEPTION-INVITATIONS-REPAS": "RECEPTION-INVITATIONS-REPAS",
     "HOTEL-HEBERGEMENT":           "HÔTEL-HEBERGEMENT",
     "TRANSPORT - CARBURANT":       "TRANSPORT - CARBURANT",
     "TELEPHONE":                   "TÉLÉPHONE",
     "AFFRANCHISSEMENT":            "AFFRANCHISSEMENT",
+    "DIVERS":                      "DIVERS",
 }
 CURRENCIES = {"€ (Euro)": "€", "$ (Dollar)": "$"}
 MONTHS_FR  = [
@@ -77,8 +77,8 @@ MONTHS_FR  = [
 ]
 
 # ─── Streamlit config ─────────────────────────────────────────────────────────
-st.set_page_config(page_title="Note de Frais", page_icon="💼", layout="wide")
-st.title("📝 Note de Frais - Gestion des Dépenses")
+st.set_page_config(page_title="Note de frais - formulaire", page_icon="💼", layout="wide")
+st.title("📝 Note de frais - formulaire")
 
 
 # ─── Fonction de compression d'images ─────────────────────────────────────────
@@ -153,8 +153,8 @@ for _k, _d in [
 
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
 st.sidebar.header("Informations Utilisateur")
-user_name      = st.sidebar.text_input("👤 Nom")
-user_company   = st.sidebar.selectbox("🏢 Société/École", COMPANIES)
+user_name      = st.sidebar.text_input("👤 Prénom Nom")
+user_company   = st.sidebar.selectbox("🏢 Société/École", [""] + COMPANIES)
 currency_label = st.sidebar.selectbox(
     "💱 Devise (montants TTC)", list(CURRENCIES.keys()), index=0
 )
@@ -436,7 +436,8 @@ with st.form(key=f"expense_form_{st.session_state.form_key}"):
 # ─── Traitement formulaire ────────────────────────────────────────────────────
 if submitted:
     errors = []
-    if not user_name.strip():    errors.append("Nom (barre latérale)")
+    if not user_name.strip():    errors.append("Prénom Nom (barre latérale)")
+    if not user_company.strip(): errors.append("Société/École (barre latérale)")
     if not supplier.strip():     errors.append("Fournisseur")
     if not object_desc.strip():  errors.append("Objet")
     if amount <= 0:              errors.append("Montant TTC (> 0)")
@@ -635,7 +636,7 @@ if signature_method == "✍️ Signature manuscrite stylisée":
     with btn_col:
         if st.button("✅ Générer ma signature manuscrite", type="primary", use_container_width=True):
             if not user_name.strip():
-                st.warning("⚠️ Veuillez d'abord saisir votre nom dans la barre latérale.")
+                st.warning("⚠️ Veuillez d'abord saisir votre prénom et nom dans la barre latérale.")
             else:
                 sig_bytes = generate_signature_from_name(user_name)
                 st.session_state.signature_b64 = base64.b64encode(sig_bytes).decode()
@@ -657,7 +658,9 @@ if st.session_state.expense_data:
     with btn2:
         if st.button("📄 Générer la Note de Frais PDF", type="primary", use_container_width=True):
             if not user_name.strip():
-                st.warning("⚠️ Veuillez saisir votre Nom dans la barre latérale.")
+                st.warning("⚠️ Veuillez saisir votre Prénom et Nom dans la barre latérale.")
+            elif not user_company.strip():
+                st.warning("⚠️ Veuillez sélectionner votre Société/École dans la barre latérale.")
             else:
                 with st.spinner("Génération du PDF fusionné…"):
                     try:
