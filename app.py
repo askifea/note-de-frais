@@ -80,6 +80,65 @@ MONTHS_FR  = [
 st.set_page_config(page_title="Note de Frais", page_icon="💼", layout="wide")
 st.title("📝 Note de Frais - Gestion des Dépenses")
 
+
+# ─── Fonction de compression d'images ─────────────────────────────────────────
+def compress_image(image_bytes, max_size_kb=500, quality=85):
+    """
+    Compresse une image pour réduire la taille du PDF final.
+    
+    Args:
+        image_bytes: bytes de l'image originale
+        max_size_kb: taille maximale cible en KB (par défaut 500KB)
+        quality: qualité JPEG (1-100, par défaut 85)
+    
+    Returns:
+        bytes de l'image compressée
+    """
+    try:
+        # Ouvrir l'image
+        img = PILImage.open(io.BytesIO(image_bytes))
+        
+        # Convertir en RGB si nécessaire (pour PNG avec transparence)
+        if img.mode in ('RGBA', 'LA', 'P'):
+            background = PILImage.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+            img = background
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+        
+        # Redimensionner si l'image est très grande (max 1920px de largeur)
+        max_width = 1920
+        if img.width > max_width:
+            ratio = max_width / img.width
+            new_height = int(img.height * ratio)
+            img = img.resize((max_width, new_height), PILImage.Resampling.LANCZOS)
+        
+        # Compresser avec qualité ajustable
+        output = io.BytesIO()
+        current_quality = quality
+        
+        # Boucle pour ajuster la qualité jusqu'à atteindre la taille cible
+        while current_quality > 20:
+            output.seek(0)
+            output.truncate()
+            img.save(output, format='JPEG', quality=current_quality, optimize=True)
+            size_kb = len(output.getvalue()) / 1024
+            
+            if size_kb <= max_size_kb or current_quality <= 30:
+                break
+            
+            # Réduire la qualité progressivement
+            current_quality -= 10
+        
+        output.seek(0)
+        return output.read()
+    
+    except Exception as e:
+        # En cas d'erreur, retourner l'image originale
+        return image_bytes
+
 # ─── Session State ────────────────────────────────────────────────────────────
 for _k, _d in [
     ("expense_data",        []),
@@ -368,7 +427,7 @@ with st.form(key=f"expense_form_{st.session_state.form_key}"):
         )
     with col3:
         amount        = st.number_input(f"💰 Montant TTC ({currency})", min_value=0.0, format="%.2f")
-        budget_input  = st.text_input("📊 Imputation budgétaire *")
+        budget_input  = st.text_input("📊 Imputation budgétaire (facultatif)")
         uploaded_file = st.file_uploader(
             "📄 Joindre un Justificatif", type=["pdf", "jpg", "jpeg", "png"]
         )
@@ -381,7 +440,7 @@ if submitted:
     if not supplier.strip():     errors.append("Fournisseur")
     if not object_desc.strip():  errors.append("Objet")
     if amount <= 0:              errors.append("Montant TTC (> 0)")
-    if not budget_input.strip(): errors.append("**Imputation budgétaire** ⚠️ champ obligatoire")
+    # Budget imputation is now optional (no validation needed)
     if not uploaded_file:        errors.append("Justificatif (pièce jointe)")
 
     if errors:
@@ -390,6 +449,17 @@ if submitted:
         file_bytes = uploaded_file.read()
         file_name  = uploaded_file.name
         ext        = file_name.lower().rsplit(".", 1)[-1]
+        
+        # Compresser les images pour réduire la taille du PDF
+        if ext in ("jpg", "jpeg", "png"):
+            original_size = len(file_bytes) / 1024  # KB
+            file_bytes = compress_image(file_bytes, max_size_kb=500, quality=85)
+            compressed_size = len(file_bytes) / 1024  # KB
+            
+            if compressed_size < original_size * 0.9:  # Si compression >10%
+                st.info(f"📦 Image compressée : {original_size:.0f} KB → {compressed_size:.0f} KB "
+                       f"({100*(1-compressed_size/original_size):.0f}% de réduction)")
+        
         st.session_state.expense_data.append({
             "Date":                      expense_date.strftime("%d/%m/%Y"),
             "Fournisseur":               supplier.strip(),
