@@ -55,20 +55,20 @@ COMPANY_INFO = {
 
 COMPANIES          = list(COMPANY_INFO.keys())
 EXPENSE_CATEGORIES = [
+    "DIVERS",
     "RECEPTION-INVITATIONS-REPAS",
     "HOTEL-HEBERGEMENT",
     "TRANSPORT - CARBURANT",
     "TELEPHONE",
     "AFFRANCHISSEMENT",
-    "DIVERS",
 ]
 EXPENSE_LABELS = {
+    "DIVERS":                      "DIVERS",
     "RECEPTION-INVITATIONS-REPAS": "RECEPTION-INVITATIONS-REPAS",
     "HOTEL-HEBERGEMENT":           "HÔTEL-HEBERGEMENT",
     "TRANSPORT - CARBURANT":       "TRANSPORT - CARBURANT",
     "TELEPHONE":                   "TÉLÉPHONE",
     "AFFRANCHISSEMENT":            "AFFRANCHISSEMENT",
-    "DIVERS":                      "DIVERS",
 }
 CURRENCIES = {"€ (Euro)": "€", "$ (Dollar)": "$"}
 MONTHS_FR  = [
