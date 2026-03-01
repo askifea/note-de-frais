@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Demande de Paiement d'Acompte – IFEA</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6fa;
+      color: #222;
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+
+    .card {
+      background: #fff;
+      max-width: 780px;
+      margin: 0 auto;
+      border-radius: 10px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.10);
+      padding: 40px 44px 36px;
+    }
+
+    .logo-header {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 28px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #e8eaf0;
+    }
+
+    .logo-header img {
+      height: 54px;
+      width: auto;
+    }
+
+    .logo-header .titles {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo-header .org {
+      font-size: 0.78rem;
+      color: #888;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .logo-header h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #1a3a6b;
+      line-height: 1.2;
+    }
+
+    fieldset {
+      border: 1.5px solid #dde1ea;
+      border-radius: 7px;
+      padding: 18px 20px 14px;
+      margin-bottom: 22px;
+    }
+
+    legend {
+      font-weight: 700;
+      font-size: 0.88rem;
+      color: #1a3a6b;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      padding: 0 8px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .form-row:last-child { margin-bottom: 0; }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .field.full { flex: 1 1 100%; }
+    .field.half { flex: 1 1 calc(50% - 8px); }
+    .field.third { flex: 1 1 calc(33% - 11px); }
+
+    label {
+      font-size: 0.80rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 5px;
+      letter-spacing: 0.01em;
+    }
+
+    label .required { color: #c0392b; margin-left: 2px; }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="number"],
+    textarea,
+    select {
+      border: 1.5px solid #c8cdd8;
+      border-radius: 5px;
+      padding: 8px 11px;
+      font-size: 0.92rem;
+      color: #222;
+      background: #fafbfd;
+      transition: border-color 0.18s;
+      width: 100%;
+      font-family: inherit;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #1a3a6b;
+      background: #fff;
+    }
+
+    input::placeholder, textarea::placeholder { color: #bbb; }
+
+    textarea { resize: vertical; min-height: 72px; }
+
+    /* Échéances */
+    .echeance-block {
+      background: #f7f9fc;
+      border: 1px dashed #c5cad8;
+      border-radius: 6px;
+      padding: 13px 16px 10px;
+      margin-bottom: 10px;
+    }
+
+    .echeance-block:last-child { margin-bottom: 0; }
+
+    .echeance-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #1a3a6b;
+      margin-bottom: 10px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .echeance-block.optional .echeance-label::after {
+      content: " (optionnelle)";
+      font-weight: 400;
+      color: #999;
+      text-transform: none;
+    }
+
+    /* Submit */
+    .submit-area {
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    .btn-submit {
+      background: #1a3a6b;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 13px 44px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      transition: background 0.18s, transform 0.1s;
+    }
+
+    .btn-submit:hover { background: #14305a; transform: translateY(-1px); }
+    .btn-submit:active { transform: translateY(0); }
+
+    .help-text {
+      font-size: 0.75rem;
+      color: #999;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 560px) {
+      .card { padding: 22px 14px 20px; }
+      .field.half, .field.third { flex: 1 1 100%; }
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <div class="logo-header">
+    <div class="titles">
+      <span class="org">IFEA – Institut de Formation</span>
+      <h1>Demande de Paiement d'Acompte</h1>
+    </div>
+  </div>
+
+  <form id="demandeForm" novalidate>
+
+    <!-- Fournisseur -->
+    <fieldset>
+      <legend>Fournisseur &amp; Commande</legend>
+
+      <div class="form-row">
+        <div class="field full">
+          <label for="fournisseur">Fournisseur <span class="required">*</span></label>
+          <input type="text" id="fournisseur" placeholder="Nom du fournisseur / prestataire" required />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field half">
+          <label for="montantCommande">Montant TTC total de la commande / prestation <span class="required">*</span></label>
+          <input type="number" id="montantCommande" placeholder="0,00" min="0" step="0.01" required />
+        </div>
+        <div class="field half">
+          <label for="imputationBudgetaire">Imputation budgétaire <span class="required">*</span></label>
+          <input type="text" id="imputationBudgetaire" placeholder="Ex : 604100 / Projet X" required />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field full">
+          <label for="description">Description de la commande / prestation <span class="required">*</span></label>
+          <textarea id="description" placeholder="Décrivez brièvement la commande ou la prestation concernée…" required></textarea>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- Échéances -->
+    <fieldset>
+      <legend>Échéances de paiement (jusqu'à 4)</legend>
+
+      <!-- Échéance 1 – obligatoire -->
+      <div class="echeance-block">
+        <div class="echeance-label">Échéance 1</div>
+        <div class="form-row">
+          <div class="field half">
+            <label for="montant1">Montant TTC de l'acompte <span class="required">*</span></label>
+            <input type="number" id="montant1" placeholder="0,00" min="0" step="0.01" required />
+          </div>
+          <div class="field half">
+            <label for="date1">Date de paiement <span class="required">*</span></label>
+            <input type="date" id="date1" required />
+          </div>
+        </div>
+      </div>
+
+      <!-- Échéance 2 -->
+      <div class="echeance-block optional">
+        <div class="echeance-label">Échéance 2</div>
+        <div class="form-row">
+          <div class="field half">
+            <label for="montant2">Montant TTC de l'acompte</label>
+            <input type="number" id="montant2" placeholder="0,00" min="0" step="0.01" />
+          </div>
+          <div class="field half">
+            <label for="date2">Date de paiement</label>
+            <input type="date" id="date2" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Échéance 3 -->
+      <div class="echeance-block optional">
+        <div class="echeance-label">Échéance 3</div>
+        <div class="form-row">
+          <div class="field half">
+            <label for="montant3">Montant TTC de l'acompte</label>
+            <input type="number" id="montant3" placeholder="0,00" min="0" step="0.01" />
+          </div>
+          <div class="field half">
+            <label for="date3">Date de paiement</label>
+            <input type="date" id="date3" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Échéance 4 -->
+      <div class="echeance-block optional">
+        <div class="echeance-label">Échéance 4</div>
+        <div class="form-row">
+          <div class="field half">
+            <label for="montant4">Montant TTC de l'acompte</label>
+            <input type="number" id="montant4" placeholder="0,00" min="0" step="0.01" />
+          </div>
+          <div class="field half">
+            <label for="date4">Date de paiement</label>
+            <input type="date" id="date4" />
+          </div>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- Demandeur -->
+    <fieldset>
+      <legend>Demandeur</legend>
+      <div class="form-row">
+        <div class="field half">
+          <label for="nomPrenom">Nom &amp; Prénom <span class="required">*</span></label>
+          <input type="text" id="nomPrenom" placeholder="Prénom NOM" required />
+        </div>
+        <div class="field half">
+          <label for="dateDemande">Date de la demande <span class="required">*</span></label>
+          <input type="date" id="dateDemande" required />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field full">
+          <label for="commentaire">Commentaire</label>
+          <textarea id="commentaire" placeholder="Informations complémentaires éventuelles…"></textarea>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="submit-area">
+      <button type="submit" class="btn-submit">Envoyer la demande</button>
+      <p class="help-text">Un email pré-rempli s'ouvrira dans votre messagerie Gmail.</p>
+    </div>
+
+  </form>
+</div>
+
+<script>
+  // Pre-fill today's date
+  (function () {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dateDemande').value = today;
+  })();
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
+  }
+
+  function formatMontant(val) {
+    if (!val) return '';
+    return parseFloat(val).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  }
+
+  function buildEmailBody(data) {
+    let body = '';
+    body += `Demande de paiement d'acompte\n`;
+    body += `${'='.repeat(40)}\n\n`;
+    body += `Fournisseur          : ${data.fournisseur}\n`;
+    body += `Montant TTC commande : ${data.montantCommande}\n`;
+    body += `Imputation budgétaire: ${data.imputationBudgetaire}\n\n`;
+
+    body += `Description de la commande / prestation :\n${data.description}\n\n`;
+
+    body += `Échéances de paiement :\n`;
+    body += `-`.repeat(30) + `\n`;
+    data.echeances.forEach((e, i) => {
+      body += `  Échéance ${i + 1} : ${e.montant}  –  le ${e.date}\n`;
+    });
+    body += `\n`;
+
+    if (data.commentaire) {
+      body += `Commentaire :\n${data.commentaire}\n\n`;
+    }
+
+    body += `-`.repeat(40) + `\n`;
+    body += `Demandeur   : ${data.nomPrenom}\n`;
+    body += `Date        : ${data.dateDemande}\n`;
+
+    return body;
+  }
+
+  document.getElementById('demandeForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    // Gather required fields
+    const fournisseur       = document.getElementById('fournisseur').value.trim();
+    const montantCommande   = document.getElementById('montantCommande').value.trim();
+    const imputationBudgetaire = document.getElementById('imputationBudgetaire').value.trim();
+    const description       = document.getElementById('description').value.trim();
+    const montant1          = document.getElementById('montant1').value.trim();
+    const date1             = document.getElementById('date1').value.trim();
+    const nomPrenom         = document.getElementById('nomPrenom').value.trim();
+    const dateDemande       = document.getElementById('dateDemande').value.trim();
+    const commentaire       = document.getElementById('commentaire').value.trim();
+
+    // Validate required fields
+    const missing = [];
+    if (!fournisseur)           missing.push('Fournisseur');
+    if (!montantCommande)       missing.push('Montant TTC total de la commande');
+    if (!imputationBudgetaire)  missing.push('Imputation budgétaire');
+    if (!description)           missing.push('Description');
+    if (!montant1)              missing.push('Montant TTC de l\'acompte (Échéance 1)');
+    if (!date1)                 missing.push('Date de paiement (Échéance 1)');
+    if (!nomPrenom)             missing.push('Nom & Prénom');
+    if (!dateDemande)           missing.push('Date de la demande');
+
+    if (missing.length > 0) {
+      alert('Veuillez remplir les champs obligatoires :\n• ' + missing.join('\n• '));
+      return;
+    }
+
+    // Build echéances array
+    const echeances = [{ montant: formatMontant(montant1), date: formatDate(date1) }];
+    for (let i = 2; i <= 4; i++) {
+      const m = document.getElementById('montant' + i).value.trim();
+      const d = document.getElementById('date' + i).value.trim();
+      if (m && d) {
+        echeances.push({ montant: formatMontant(m), date: formatDate(d) });
+      }
+    }
+
+    const data = {
+      fournisseur,
+      montantCommande: formatMontant(montantCommande),
+      imputationBudgetaire,
+      description,
+      echeances,
+      nomPrenom,
+      dateDemande: formatDate(dateDemande),
+      commentaire,
+    };
+
+    const subject = encodeURIComponent(
+      `Demande d'acompte – ${fournisseur} – ${formatDate(dateDemande)}`
+    );
+    const body = encodeURIComponent(buildEmailBody(data));
+    const to   = 'antoine.djondo@ifea.education';
+    const cc   = 'comptabilite@ifea.education';
+
+    const mailtoLink = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
+    window.location.href = mailtoLink;
+  });
+</script>
+</body>
+</html>
