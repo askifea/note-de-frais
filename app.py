@@ -52,7 +52,7 @@ COMPANY_INFO = {
         "logo_b64": _IFEA_LOGO_B64,
     },
     "Association LISA": {
-        "address":  "",
+        "address":  "28 rue Petit – 92110 Clichy",
         "logo_b64": None,
     },
 }
