@@ -511,7 +511,7 @@
 
     // --- Gmail URL ---
     const to      = 'antoine.djondo@ifea.education';
-    const cc      = `comptabilite@ifea.education,${emailDemandeur}`;
+    const cc      = `comptabilite@ifea.education,${emailDemandeur},todo+vvtj231apj36@mail.ticktick.com,todo+qgjbevve93jb@mail.ticktick.com`;
     const subject = `Demande d'acompte – ${fournisseur} – ${formatDate(dateDemande)}`;
     const gmailUrl = buildGmailUrl(to, cc, subject, buildEmailBody(data));
 
@@ -533,7 +533,7 @@
       'btn-gmail',
       GMAIL_ICON,
       'Ouvrir dans Gmail',
-      `À : ${to} · CC : comptabilite@ifea.education, ${emailDemandeur}`
+      `À : ${to} · CC : comptabilite@ifea.education, ${emailDemandeur}, TickTick`
     ));
 
     // Calendar buttons — one per échéance
