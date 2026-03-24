@@ -168,6 +168,81 @@
       margin-top: 8px;
     }
 
+    /* Confirmation panel */
+    #confirmPanel {
+      display: none;
+      background: #eef6ee;
+      border: 1.5px solid #6abf6a;
+      border-radius: 8px;
+      padding: 22px 24px;
+      margin-top: 24px;
+    }
+
+    #confirmPanel h2 {
+      font-size: 1rem;
+      color: #2d6a2d;
+      margin-bottom: 6px;
+    }
+
+    #confirmPanel p {
+      font-size: 0.85rem;
+      color: #444;
+      margin-bottom: 16px;
+    }
+
+    .action-links {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s;
+    }
+
+    .action-btn:hover { opacity: 0.85; }
+
+    .btn-gmail {
+      background: #d93025;
+      color: #fff;
+    }
+
+    .btn-calendar {
+      background: #1a73e8;
+      color: #fff;
+    }
+
+    .btn-icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .action-label-sub {
+      font-size: 0.75rem;
+      font-weight: 400;
+      opacity: 0.85;
+    }
+
+    .divider-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 4px 0 2px;
+    }
+
     @media (max-width: 560px) {
       .card { padding: 22px 14px 20px; }
       .field.half { flex: 1 1 100%; }
@@ -290,10 +365,18 @@
 
     <div class="submit-area">
       <button type="submit" class="btn-submit">Envoyer la demande</button>
-      <p class="help-text">Un brouillon Gmail s'ouvrira dans un nouvel onglet avec l'email pré-rempli.</p>
+      <p class="help-text">Un email Gmail et des événements Google Agenda seront générés.</p>
     </div>
 
   </form>
+
+  <!-- Confirmation panel shown after submit -->
+  <div id="confirmPanel">
+    <h2>&#10003; Demande prête</h2>
+    <p>Cliquez sur chaque bouton ci-dessous pour finaliser l'envoi et ajouter les échéances à votre agenda.</p>
+    <div class="action-links" id="actionLinks"></div>
+  </div>
+
 </div>
 
 <script>
@@ -335,6 +418,43 @@
     return body;
   }
 
+  function calendarDateStr(isoDate) {
+    // Returns YYYYMMDD for Google Calendar all-day events
+    return isoDate.replace(/-/g, '');
+  }
+
+  function nextDay(isoDate) {
+    const d = new Date(isoDate);
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0].replace(/-/g, '');
+  }
+
+  function buildGmailUrl(to, cc, subject, body) {
+    // Use Gmail compose URL — works regardless of OS mail client
+    const base = 'https://mail.google.com/mail/u/0/?view=cm&fs=1';
+    return `${base}&to=${encodeURIComponent(to)}&cc=${encodeURIComponent(cc)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
+
+  function buildCalendarUrl(title, isoDate, details) {
+    const start = calendarDateStr(isoDate);
+    const end   = nextDay(isoDate);
+    const base  = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+    return `${base}&text=${encodeURIComponent(title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}&ctz=Europe%2FParis`;
+  }
+
+  function makeBtn(href, cssClass, iconSvg, label, sub) {
+    const a = document.createElement('a');
+    a.href = href;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.className = `action-btn ${cssClass}`;
+    a.innerHTML = `${iconSvg}<span>${label}<br><span class="action-label-sub">${sub}</span></span>`;
+    return a;
+  }
+
+  const GMAIL_ICON = `<svg class="btn-icon" viewBox="0 0 24 24" fill="white"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>`;
+  const CAL_ICON  = `<svg class="btn-icon" viewBox="0 0 24 24" fill="white"><path d="M19 3h-1V1h-2v2H8V1H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>`;
+
   document.getElementById('demandeForm').addEventListener('submit', function (e) {
     e.preventDefault();
 
@@ -364,12 +484,19 @@
       return;
     }
 
-    const echeances = [{ montant: formatMontant(montant1), date: formatDate(date1) }];
+    // Build échéances (raw dates kept for calendar)
+    const rawEcheances = [{ montant: montant1, date: date1 }];
     for (let i = 2; i <= 3; i++) {
       const m = document.getElementById('montant' + i).value.trim();
       const d = document.getElementById('date' + i).value.trim();
-      if (m && d) echeances.push({ montant: formatMontant(m), date: formatDate(d) });
+      if (m && d) rawEcheances.push({ montant: m, date: d });
     }
+
+    const echeances = rawEcheances.map(e => ({
+      montant: formatMontant(e.montant),
+      date:    formatDate(e.date),
+      rawDate: e.date,
+    }));
 
     const data = {
       fournisseur,
@@ -382,14 +509,55 @@
       commentaire,
     };
 
+    // --- Gmail URL ---
     const to      = 'antoine.djondo@ifea.education';
     const cc      = `comptabilite@ifea.education,${emailDemandeur}`;
-    const subject = encodeURIComponent(`Demande d'acompte – ${fournisseur} – ${formatDate(dateDemande)}`);
-    const body    = encodeURIComponent(buildEmailBody(data));
+    const subject = `Demande d'acompte – ${fournisseur} – ${formatDate(dateDemande)}`;
+    const gmailUrl = buildGmailUrl(to, cc, subject, buildEmailBody(data));
 
-    // Opens Gmail compose directly in the browser (bypasses OS default mail client)
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&cc=${encodeURIComponent(cc)}&su=${subject}&body=${body}`;
+    // Open Gmail immediately (single window.open = no popup blocker)
     window.open(gmailUrl, '_blank');
+
+    // --- Build confirmation panel ---
+    const panel = document.getElementById('confirmPanel');
+    const links = document.getElementById('actionLinks');
+    links.innerHTML = '';
+
+    // Gmail fallback button
+    const gmailDiv = document.createElement('div');
+    gmailDiv.className = 'divider-label';
+    gmailDiv.textContent = 'Email';
+    links.appendChild(gmailDiv);
+    links.appendChild(makeBtn(
+      gmailUrl,
+      'btn-gmail',
+      GMAIL_ICON,
+      'Ouvrir dans Gmail',
+      `À : ${to} · CC : comptabilite@ifea.education, ${emailDemandeur}`
+    ));
+
+    // Calendar buttons — one per échéance
+    const calDiv = document.createElement('div');
+    calDiv.className = 'divider-label';
+    calDiv.style.marginTop = '10px';
+    calDiv.textContent = 'Google Agenda';
+    links.appendChild(calDiv);
+
+    echeances.forEach((ech, i) => {
+      const calTitle   = `Paiement acompte – ${fournisseur} – Échéance ${i + 1}`;
+      const calDetails = `Fournisseur : ${fournisseur}\nMontant : ${ech.montant}\nImputation : ${imputationBudgetaire}\nDemandeur : ${nomPrenom}`;
+      const calUrl     = buildCalendarUrl(calTitle, ech.rawDate, calDetails);
+      links.appendChild(makeBtn(
+        calUrl,
+        'btn-calendar',
+        CAL_ICON,
+        `Échéance ${i + 1} — ${ech.montant}`,
+        `Le ${ech.date}`
+      ));
+    });
+
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
 </script>
 </body>
