@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Demande de Paiement d'Acompte – IFEA</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6fa;
+      color: #222;
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+
+    .card {
+      background: #fff;
+      max-width: 780px;
+      margin: 0 auto;
+      border-radius: 10px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.10);
+      padding: 40px 44px 36px;
+    }
+
+    .page-header {
+      margin-bottom: 28px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #e8eaf0;
+    }
+
+    .page-header h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #1a3a6b;
+    }
+
+    .page-header .org {
+      font-size: 0.78rem;
+      color: #888;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    fieldset {
+      border: 1.5px solid #dde1ea;
+      border-radius: 7px;
+      padding: 18px 20px 14px;
+      margin-bottom: 22px;
+    }
+
+    legend {
+      font-weight: 700;
+      font-size: 0.88rem;
+      color: #1a3a6b;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      padding: 0 8px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .form-row:last-child { margin-bottom: 0; }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .field.full { flex: 1 1 100%; }
+    .field.half { flex: 1 1 calc(50% - 8px); }
+
+    label {
+      font-size: 0.80rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 5px;
+    }
+
+    label .required { color: #c0392b; margin-left: 2px; }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="date"],
+    input[type="number"],
+    textarea {
+      border: 1.5px solid #c8cdd8;
+      border-radius: 5px;
+      padding: 8px 11px;
+      font-size: 0.92rem;
+      color: #222;
+      background: #fafbfd;
+      transition: border-color 0.18s;
+      width: 100%;
+      font-family: inherit;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #1a3a6b;
+      background: #fff;
+    }
+
+    input::placeholder, textarea::placeholder { color: #bbb; }
+
+    textarea { resize: vertical; min-height: 72px; }
+
+    .echeance-block {
+      background: #f7f9fc;
+      border: 1px dashed #c5cad8;
+      border-radius: 6px;
+      padding: 13px 16px 10px;
+      margin-bottom: 10px;
+    }
+
+    .echeance-block:last-child { margin-bottom: 0; }
+
+    .echeance-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #1a3a6b;
+      margin-bottom: 10px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .echeance-block.optional .echeance-label::after {
+      content: " (optionnelle)";
+      font-weight: 400;
+      color: #999;
+      text-transform: none;
+    }
+
+    .submit-area {
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    .btn-submit {
+      background: #1a3a6b;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 13px 44px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      transition: background 0.18s, transform 0.1s;
+    }
+
+    .btn-submit:hover { background: #14305a; transform: translateY(-1px); }
+    .btn-submit:active { transform: translateY(0); }
+
+    .help-text {
+      font-size: 0.75rem;
+      color: #999;
+      margin-top: 8px;
+    }
+
+    /* Confirmation panel */
+    #confirmPanel {
+      display: none;
+      background: #eef6ee;
+      border: 1.5px solid #6abf6a;
+      border-radius: 8px;
+      padding: 22px 24px;
+      margin-top: 24px;
+    }
+
+    #confirmPanel h2 {
+      font-size: 1rem;
+      color: #2d6a2d;
+      margin-bottom: 6px;
+    }
+
+    #confirmPanel p {
+      font-size: 0.85rem;
+      color: #444;
+      margin-bottom: 16px;
+    }
+
+    .action-links {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s;
+    }
+
+    .action-btn:hover { opacity: 0.85; }
+
+    .btn-gmail {
+      background: #d93025;
+      color: #fff;
+    }
+
+    .btn-calendar {
+      background: #1a73e8;
+      color: #fff;
+    }
+
+    .btn-icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .action-label-sub {
+      font-size: 0.75rem;
+      font-weight: 400;
+      opacity: 0.85;
+    }
+
+    .divider-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 4px 0 2px;
+    }
+
+    @media (max-width: 560px) {
+      .card { padding: 22px 14px 20px; }
+      .field.half { flex: 1 1 100%; }
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <div class="page-header">
+    <div class="org">IFEA</div>
+    <h1>Demande de Paiement d'Acompte</h1>
+  </div>
+
+  <form id="demandeForm" novalidate>
+
+    <!-- Fournisseur & Commande -->
+    <fieldset>
+      <legend>Fournisseur &amp; Commande</legend>
+
+      <div class="form-row">
+        <div class="field full">
+          <label for="fournisseur">Fournisseur <span class="required">*</span></label>
+          <input type="text" id="fournisseur" placeholder="Nom du fournisseur / prestataire" required />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field half">
+          <label for="montantCommande">Montant TTC total de la commande / prestation</label>
+          <input type="number" id="montantCommande" placeholder="0,00" min="0" step="0.01" />
+        </div>
+        <div class="field half">
+          <label for="imputationBudgetaire">Imputation budgétaire <span class="required">*</span></label>
+          <input type="text" id="imputationBudgetaire" placeholder="Ex : 604100 / Projet X" required />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field full">
+          <label for="description">Description de la commande / prestation <span class="required">*</span></label>
+          <textarea id="description" placeholder="Décrivez brièvement la commande ou la prestation concernée…" required></textarea>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- Échéances -->
+    <fieldset>
+      <legend>Échéances de paiement (jusqu'à 3)</legend>
+
+      <div class="echeance-block">
+        <div class="echeance-label">Échéance 1</div>
+        <div class="form-row">
+          <div class="field half">
+            <label for="montant1">Montant TTC de l'acompte <span class="required">*</span></label>
+            <input type="number" id="montant1" placeholder="0,00" min="0" step="0.01" required />
+          </div>
+          <div class="field half">
+            <label for="date1">Date de paiement <span class="required">*</span></label>
+            <input type="date" id="date1" required />
+          </div>
+        </div>
+      </div>
+
+      <div class="echeance-block optional">
+        <div class="echeance-label">Échéance 2</div>
+        <div class="form-row">
+          <div class="field half">
+            <label for="montant2">Montant TTC de l'acompte</label>
+            <input type="number" id="montant2" placeholder="0,00" min="0" step="0.01" />
+          </div>
+          <div class="field half">
+            <label for="date2">Date de paiement</label>
+            <input type="date" id="date2" />
+          </div>
+        </div>
+      </div>
+
+      <div class="echeance-block optional">
+        <div class="echeance-label">Échéance 3</div>
+        <div class="form-row">
+          <div class="field half">
+            <label for="montant3">Montant TTC de l'acompte</label>
+            <input type="number" id="montant3" placeholder="0,00" min="0" step="0.01" />
+          </div>
+          <div class="field half">
+            <label for="date3">Date de paiement</label>
+            <input type="date" id="date3" />
+          </div>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- Demandeur -->
+    <fieldset>
+      <legend>Demandeur</legend>
+      <div class="form-row">
+        <div class="field half">
+          <label for="nomPrenom">Nom &amp; Prénom <span class="required">*</span></label>
+          <input type="text" id="nomPrenom" placeholder="Prénom NOM" required />
+        </div>
+        <div class="field half">
+          <label for="emailDemandeur">Votre adresse email <span class="required">*</span></label>
+          <input type="email" id="emailDemandeur" placeholder="prenom.nom@ifea.education" required />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field half">
+          <label for="dateDemande">Date de la demande <span class="required">*</span></label>
+          <input type="date" id="dateDemande" required />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field full">
+          <label for="commentaire">Commentaire</label>
+          <textarea id="commentaire" placeholder="Informations complémentaires éventuelles…"></textarea>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="submit-area">
+      <button type="submit" class="btn-submit">Envoyer la demande</button>
+      <p class="help-text">Un email Gmail et des événements Google Agenda seront générés.</p>
+    </div>
+
+  </form>
+
+  <!-- Confirmation panel shown after submit -->
+  <div id="confirmPanel">
+    <h2>&#10003; Demande prête</h2>
+    <p>Cliquez sur chaque bouton ci-dessous pour finaliser l'envoi et ajouter les échéances à votre agenda.</p>
+    <div class="action-links" id="actionLinks"></div>
+  </div>
+
+</div>
+
+<script>
+  (function () {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dateDemande').value = today;
+  })();
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
+  }
+
+  function formatMontant(val) {
+    if (!val) return '';
+    return parseFloat(val).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  }
+
+  function buildEmailBody(data) {
+    let body = `DEMANDE DE PAIEMENT D'ACOMPTE\n${'='.repeat(40)}\n\n`;
+    body += `Fournisseur           : ${data.fournisseur}\n`;
+    if (data.montantCommande) {
+      body += `Montant TTC commande  : ${data.montantCommande}\n`;
+    }
+    body += `Imputation budgétaire : ${data.imputationBudgetaire}\n\n`;
+    body += `Description :\n${data.description}\n\n`;
+    body += `Échéances de paiement :\n${'-'.repeat(30)}\n`;
+    data.echeances.forEach((e, i) => {
+      body += `  Échéance ${i + 1} : ${e.montant}  –  le ${e.date}\n`;
+    });
+    body += '\n';
+    if (data.commentaire) {
+      body += `Commentaire :\n${data.commentaire}\n\n`;
+    }
+    body += `${'-'.repeat(40)}\n`;
+    body += `Demandeur : ${data.nomPrenom}\n`;
+    body += `Date      : ${data.dateDemande}\n`;
+    return body;
+  }
+
+  function calendarDateStr(isoDate) {
+    // Returns YYYYMMDD for Google Calendar all-day events
+    return isoDate.replace(/-/g, '');
+  }
+
+  function nextDay(isoDate) {
+    const d = new Date(isoDate);
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0].replace(/-/g, '');
+  }
+
+  function buildGmailUrl(to, cc, subject, body) {
+    // Use Gmail compose URL — works regardless of OS mail client
+    const base = 'https://mail.google.com/mail/u/0/?view=cm&fs=1';
+    return `${base}&to=${encodeURIComponent(to)}&cc=${encodeURIComponent(cc)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
+
+  function buildCalendarUrl(title, isoDate, details) {
+    const start = calendarDateStr(isoDate);
+    const end   = nextDay(isoDate);
+    const base  = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+    return `${base}&text=${encodeURIComponent(title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}&ctz=Europe%2FParis`;
+  }
+
+  function makeBtn(href, cssClass, iconSvg, label, sub) {
+    const a = document.createElement('a');
+    a.href = href;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.className = `action-btn ${cssClass}`;
+    a.innerHTML = `${iconSvg}<span>${label}<br><span class="action-label-sub">${sub}</span></span>`;
+    return a;
+  }
+
+  const GMAIL_ICON = `<svg class="btn-icon" viewBox="0 0 24 24" fill="white"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>`;
+  const CAL_ICON  = `<svg class="btn-icon" viewBox="0 0 24 24" fill="white"><path d="M19 3h-1V1h-2v2H8V1H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>`;
+
+  document.getElementById('demandeForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    const fournisseur          = document.getElementById('fournisseur').value.trim();
+    const montantCommande      = document.getElementById('montantCommande').value.trim();
+    const imputationBudgetaire = document.getElementById('imputationBudgetaire').value.trim();
+    const description          = document.getElementById('description').value.trim();
+    const montant1             = document.getElementById('montant1').value.trim();
+    const date1                = document.getElementById('date1').value.trim();
+    const nomPrenom            = document.getElementById('nomPrenom').value.trim();
+    const emailDemandeur       = document.getElementById('emailDemandeur').value.trim();
+    const dateDemande          = document.getElementById('dateDemande').value.trim();
+    const commentaire          = document.getElementById('commentaire').value.trim();
+
+    const missing = [];
+    if (!fournisseur)           missing.push('Fournisseur');
+    if (!imputationBudgetaire)  missing.push('Imputation budgétaire');
+    if (!description)           missing.push('Description');
+    if (!montant1)              missing.push("Montant TTC de l'acompte (Échéance 1)");
+    if (!date1)                 missing.push('Date de paiement (Échéance 1)');
+    if (!nomPrenom)             missing.push('Nom & Prénom');
+    if (!emailDemandeur)        missing.push('Adresse email');
+    if (!dateDemande)           missing.push('Date de la demande');
+
+    if (missing.length > 0) {
+      alert('Veuillez remplir les champs obligatoires :\n• ' + missing.join('\n• '));
+      return;
+    }
+
+    // Build échéances (raw dates kept for calendar)
+    const rawEcheances = [{ montant: montant1, date: date1 }];
+    for (let i = 2; i <= 3; i++) {
+      const m = document.getElementById('montant' + i).value.trim();
+      const d = document.getElementById('date' + i).value.trim();
+      if (m && d) rawEcheances.push({ montant: m, date: d });
+    }
+
+    const echeances = rawEcheances.map(e => ({
+      montant: formatMontant(e.montant),
+      date:    formatDate(e.date),
+      rawDate: e.date,
+    }));
+
+    const data = {
+      fournisseur,
+      montantCommande: formatMontant(montantCommande),
+      imputationBudgetaire,
+      description,
+      echeances,
+      nomPrenom,
+      dateDemande: formatDate(dateDemande),
+      commentaire,
+    };
+
+    // --- Gmail URL ---
+    const to      = 'antoine.djondo@ifea.education';
+    const cc      = `comptabilite@ifea.education,${emailDemandeur}`;
+    const subject = `Demande d'acompte – ${fournisseur} – ${formatDate(dateDemande)}`;
+    const gmailUrl = buildGmailUrl(to, cc, subject, buildEmailBody(data));
+
+    // Open Gmail immediately (single window.open = no popup blocker)
+    window.open(gmailUrl, '_blank');
+
+    // --- Build confirmation panel ---
+    const panel = document.getElementById('confirmPanel');
+    const links = document.getElementById('actionLinks');
+    links.innerHTML = '';
+
+    // Gmail fallback button
+    const gmailDiv = document.createElement('div');
+    gmailDiv.className = 'divider-label';
+    gmailDiv.textContent = 'Email';
+    links.appendChild(gmailDiv);
+    links.appendChild(makeBtn(
+      gmailUrl,
+      'btn-gmail',
+      GMAIL_ICON,
+      'Ouvrir dans Gmail',
+      `À : ${to} · CC : comptabilite@ifea.education, ${emailDemandeur}`
+    ));
+
+    // Calendar buttons — one per échéance
+    const calDiv = document.createElement('div');
+    calDiv.className = 'divider-label';
+    calDiv.style.marginTop = '10px';
+    calDiv.textContent = 'Google Agenda';
+    links.appendChild(calDiv);
+
+    echeances.forEach((ech, i) => {
+      const calTitle   = `Paiement acompte – ${fournisseur} – Échéance ${i + 1}`;
+      const calDetails = `Fournisseur : ${fournisseur}\nMontant : ${ech.montant}\nImputation : ${imputationBudgetaire}\nDemandeur : ${nomPrenom}`;
+      const calUrl     = buildCalendarUrl(calTitle, ech.rawDate, calDetails);
+      links.appendChild(makeBtn(
+        calUrl,
+        'btn-calendar',
+        CAL_ICON,
+        `Échéance ${i + 1} — ${ech.montant}`,
+        `Le ${ech.date}`
+      ));
+    });
+
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+</script>
+</body>
+</html>
