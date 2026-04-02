@@ -243,6 +243,50 @@
       margin: 4px 0 2px;
     }
 
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      width: 17px;
+      height: 17px;
+      accent-color: #1a3a6b;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .checkbox-row label {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 0;
+      cursor: pointer;
+    }
+
+    input[type="file"] {
+      border: 1.5px solid #c8cdd8;
+      border-radius: 5px;
+      padding: 7px 11px;
+      font-size: 0.88rem;
+      color: #222;
+      background: #fafbfd;
+      width: 100%;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    input[type="file"]:focus {
+      outline: none;
+      border-color: #1a3a6b;
+      background: #fff;
+    }
+
+    #ribFileRow { transition: opacity 0.18s; }
+    #ribFileRow.hidden { display: none; }
+
     @media (max-width: 560px) {
       .card { padding: 22px 14px 20px; }
       .field.half { flex: 1 1 100%; }
@@ -336,6 +380,24 @@
       </div>
     </fieldset>
 
+    <!-- RIB / IBAN -->
+    <fieldset>
+      <legend>RIB / IBAN du fournisseur</legend>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="ibanSurDevis" />
+        <label for="ibanSurDevis">L'IBAN figure sur le devis (pas besoin de joindre un RIB séparé)</label>
+      </div>
+
+      <div class="form-row" id="ribFileRow">
+        <div class="field full">
+          <label for="ribFile">Fichier RIB / IBAN <span class="required">*</span></label>
+          <input type="file" id="ribFile" accept=".pdf,.jpg,.jpeg,.png,.webp" />
+          <p class="help-text">Formats acceptés : PDF, JPG, PNG — le fichier sera mentionné dans l'email comme pièce jointe à ajouter manuellement.</p>
+        </div>
+      </div>
+    </fieldset>
+
     <!-- Demandeur -->
     <fieldset>
       <legend>Demandeur</legend>
@@ -383,6 +445,12 @@
   (function () {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('dateDemande').value = today;
+
+    const ibanCheckbox = document.getElementById('ibanSurDevis');
+    const ribFileRow   = document.getElementById('ribFileRow');
+    ibanCheckbox.addEventListener('change', function () {
+      ribFileRow.classList.toggle('hidden', this.checked);
+    });
   })();
 
   function formatDate(dateStr) {
@@ -402,7 +470,13 @@
     if (data.montantCommande) {
       body += `Montant TTC commande  : ${data.montantCommande}\n`;
     }
-    body += `Imputation budgétaire : ${data.imputationBudgetaire}\n\n`;
+    body += `Imputation budgétaire : ${data.imputationBudgetaire}\n`;
+    if (data.ibanSurDevis) {
+      body += `RIB / IBAN            : IBAN figurant sur le devis\n`;
+    } else {
+      body += `RIB / IBAN            : Voir pièce jointe – ${data.ribFileName}\n`;
+    }
+    body += '\n';
     body += `Description :\n${data.description}\n\n`;
     body += `Échéances de paiement :\n${'-'.repeat(30)}\n`;
     data.echeances.forEach((e, i) => {
@@ -468,6 +542,8 @@
     const emailDemandeur       = document.getElementById('emailDemandeur').value.trim();
     const dateDemande          = document.getElementById('dateDemande').value.trim();
     const commentaire          = document.getElementById('commentaire').value.trim();
+    const ibanSurDevis         = document.getElementById('ibanSurDevis').checked;
+    const ribFile              = document.getElementById('ribFile').files[0];
 
     const missing = [];
     if (!fournisseur)           missing.push('Fournisseur');
@@ -475,6 +551,7 @@
     if (!description)           missing.push('Description');
     if (!montant1)              missing.push("Montant TTC de l'acompte (Échéance 1)");
     if (!date1)                 missing.push('Date de paiement (Échéance 1)');
+    if (!ibanSurDevis && !ribFile) missing.push('RIB / IBAN (fichier obligatoire si l\'IBAN ne figure pas sur le devis)');
     if (!nomPrenom)             missing.push('Nom & Prénom');
     if (!emailDemandeur)        missing.push('Adresse email');
     if (!dateDemande)           missing.push('Date de la demande');
@@ -504,14 +581,16 @@
       imputationBudgetaire,
       description,
       echeances,
+      ibanSurDevis,
+      ribFileName: ribFile ? ribFile.name : null,
       nomPrenom,
       dateDemande: formatDate(dateDemande),
       commentaire,
     };
 
     // --- Gmail URL ---
-    const to      = 'antoine.djondo@ifea.education';
-    const cc      = `comptabilite@ifea.education,${emailDemandeur},todo+vvtj231apj36@mail.ticktick.com,todo+qgjbevve93jb@mail.ticktick.com`;
+    const to      = 'antoine.djondo@ifea.education,todo+vvtj231apj36@mail.ticktick.com,todo+qgjbevve93jb@mail.ticktick.com';
+    const cc      = `comptabilite@ifea.education,${emailDemandeur}`;
     const subject = `Demande d'acompte – ${fournisseur} – ${formatDate(dateDemande)}`;
     const gmailUrl = buildGmailUrl(to, cc, subject, buildEmailBody(data));
 
@@ -533,7 +612,7 @@
       'btn-gmail',
       GMAIL_ICON,
       'Ouvrir dans Gmail',
-      `À : ${to} · CC : comptabilite@ifea.education, ${emailDemandeur}, TickTick`
+      `À : antoine.djondo@ifea.education, TickTick · CC : comptabilite@ifea.education, ${emailDemandeur}`
     ));
 
     // Calendar buttons — one per échéance
