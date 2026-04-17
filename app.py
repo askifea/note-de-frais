@@ -157,12 +157,23 @@ for _k, _d in [
 
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
 st.sidebar.header("Informations Utilisateur")
-user_name      = st.sidebar.text_input("👤 Prénom Nom")
+user_firstname = st.sidebar.text_input("👤 Prénom")
+user_lastname  = st.sidebar.text_input("👤 Nom")
+user_name      = f"{user_firstname.strip()} {user_lastname.strip()}".strip()
 user_company   = st.sidebar.selectbox("🏢 Société/École", [""] + COMPANIES)
 currency_label = st.sidebar.selectbox(
     "💱 Devise (montants TTC)", list(CURRENCIES.keys()), index=0
 )
 currency = CURRENCIES[currency_label]
+
+# ─── Numéro de facture ────────────────────────────────────────────────────────
+def build_invoice_number(lastname: str) -> str:
+    """Construit le N° de facture au format NDFNOMYYMM."""
+    nom_clean = "".join(c for c in lastname.strip().upper() if c.isalnum())
+    today     = date.today()
+    return f"NDF{nom_clean}{today.strftime('%y%m')}"
+
+invoice_number = build_invoice_number(user_lastname) if user_lastname.strip() else ""
 
 # ─── ReportLab styles ─────────────────────────────────────────────────────────
 _base = getSampleStyleSheet()
@@ -196,7 +207,7 @@ def fmt_fr(value) -> str:
         return str(value)
 
 
-def _build_header_story(story: list, company: str, name: str) -> None:
+def _build_header_story(story: list, company: str, name: str, invoice_no: str = "") -> None:
     """Ajoute le bloc en-tête (logo + infos société + nom/mois) à la story."""
     PAGE_W, _  = landscape(A4)
     usable_w   = PAGE_W - 20 * mm
@@ -213,6 +224,8 @@ def _build_header_story(story: list, company: str, name: str) -> None:
         f"<b>Nom :</b> {name}   |   "
         f"<b>Mois :</b> {current_month} {date.today().year}", _nrm,
     ))
+    if invoice_no:
+        text_items.append(_p(f"<b>N° de Facture :</b> {invoice_no}", _nrm))
 
     if b64:
         img_bytes  = base64.b64decode(b64)
@@ -238,7 +251,8 @@ def _build_header_story(story: list, company: str, name: str) -> None:
 # ─── Génération PDF ───────────────────────────────────────────────────────────
 def generate_expense_pdf(
     df: pd.DataFrame, name: str, company: str, cur: str,
-    signature_b64: str | None = None
+    signature_b64: str | None = None,
+    invoice_no: str = "",
 ) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -249,7 +263,7 @@ def generate_expense_pdf(
     story = []
 
     # En-tête
-    _build_header_story(story, company, name)
+    _build_header_story(story, company, name, invoice_no)
     story.append(Spacer(1, 5 * mm))
 
     # Tableau des dépenses
@@ -390,11 +404,11 @@ def _image_to_pdf_bytes(img_bytes: bytes) -> bytes:
     return buf.read()
 
 
-def generate_full_pdf(df, name, company, cur, uploaded_files, signature_b64=None):
+def generate_full_pdf(df, name, company, cur, uploaded_files, signature_b64=None, invoice_no=""):
     """PDF fusionné = récapitulatif + toutes les pièces jointes."""
     writer = PdfWriter()
     for page in PdfReader(io.BytesIO(
-        generate_expense_pdf(df, name, company, cur, signature_b64)
+        generate_expense_pdf(df, name, company, cur, signature_b64, invoice_no)
     )).pages:
         writer.add_page(page)
     for _, fdata in uploaded_files.items():
@@ -440,7 +454,8 @@ with st.form(key=f"expense_form_{st.session_state.form_key}"):
 # ─── Traitement formulaire ────────────────────────────────────────────────────
 if submitted:
     errors = []
-    if not user_name.strip():    errors.append("Prénom Nom (barre latérale)")
+    if not user_firstname.strip(): errors.append("Prénom (barre latérale)")
+    if not user_lastname.strip():  errors.append("Nom (barre latérale)")
     if not user_company.strip(): errors.append("Société/École (barre latérale)")
     if not supplier.strip():     errors.append("Fournisseur")
     if not object_desc.strip():  errors.append("Objet")
@@ -639,7 +654,7 @@ if signature_method == "✍️ Signature manuscrite stylisée":
     
     with btn_col:
         if st.button("✅ Générer ma signature manuscrite", type="primary", use_container_width=True):
-            if not user_name.strip():
+            if not user_firstname.strip() or not user_lastname.strip():
                 st.warning("⚠️ Veuillez d'abord saisir votre prénom et nom dans la barre latérale.")
             else:
                 sig_bytes = generate_signature_from_name(user_name)
@@ -651,7 +666,12 @@ if signature_method == "✍️ Signature manuscrite stylisée":
 if st.session_state.expense_data:
     st.markdown("---")
     st.markdown("## 🎬 Actions finales")
-    
+
+    if invoice_number:
+        st.markdown(f"**N° de Facture :** `{invoice_number}`")
+    else:
+        st.info("ℹ️ Saisissez votre **Nom** dans la barre latérale pour générer le N° de Facture.")
+
     btn1, btn2, btn3 = st.columns([1, 3, 1])
     
     with btn1:
@@ -661,7 +681,7 @@ if st.session_state.expense_data:
     
     with btn2:
         if st.button("📄 Générer la Note de Frais PDF", type="primary", use_container_width=True):
-            if not user_name.strip():
+            if not user_firstname.strip() or not user_lastname.strip():
                 st.warning("⚠️ Veuillez saisir votre Prénom et Nom dans la barre latérale.")
             elif not user_company.strip():
                 st.warning("⚠️ Veuillez sélectionner votre Société/École dans la barre latérale.")
@@ -678,6 +698,7 @@ if st.session_state.expense_data:
                             df_exp, user_name, user_company, currency,
                             st.session_state.uploaded_files_data,
                             signature_b64=st.session_state.signature_b64,
+                            invoice_no=invoice_number,
                         )
                         st.session_state.show_download = True
                     except Exception as e:
@@ -698,7 +719,10 @@ if st.session_state.expense_data:
     if st.session_state.show_download and st.session_state.pdf_bytes:
         st.markdown("###")  # Espace
         month_str = MONTHS_FR[date.today().month - 1]
-        fname = f"NDF_{user_name.replace(' ', '_')}_{month_str}_{date.today().year}.pdf"
+        fname = (
+            f"{invoice_number}.pdf" if invoice_number
+            else f"NDF_{user_name.replace(' ', '_')}_{month_str}_{date.today().year}.pdf"
+        )
         st.download_button(
             label="⬇️ Télécharger la Note de Frais (PDF fusionné)",
             data=st.session_state.pdf_bytes,
