@@ -86,9 +86,10 @@ st.set_page_config(page_title="Note de frais - formulaire", page_icon="💼", la
 # ─── Protection par token secret dans l'URL ──────────────────────────────────
 # Pour générer un nouveau token : python -c "import uuid; print(uuid.uuid4())"
 # Puis le placer dans .streamlit/secrets.toml sous [auth] token = "..."
-_expected_token = st.secrets["auth"]["token"]
+# Ou dans le dashboard Streamlit Cloud : Settings > Secrets
+_expected_token = st.secrets.get("auth", {}).get("token", "")
 _provided_token = st.query_params.get("token", "")
-if _provided_token != _expected_token:
+if not _expected_token or _provided_token != _expected_token:
     st.error("Accès refusé")
     st.stop()
 
