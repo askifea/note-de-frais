@@ -55,6 +55,10 @@ COMPANY_INFO = {
         "address":  "28 rue Petit – 92110 Clichy",
         "logo_b64": None,
     },
+    "IFEA Clichy (EDC)": {
+        "address":  "28 rue Petit – 92110 Clichy",
+        "logo_b64": _IFEA_LOGO_B64,
+    },
 }
 
 COMPANIES          = list(COMPANY_INFO.keys())
@@ -86,9 +90,10 @@ st.set_page_config(page_title="Note de frais - formulaire", page_icon="💼", la
 # ─── Protection par token secret dans l'URL ──────────────────────────────────
 # Pour générer un nouveau token : python -c "import uuid; print(uuid.uuid4())"
 # Puis le placer dans .streamlit/secrets.toml sous [auth] token = "..."
-_expected_token = st.secrets["auth"]["token"]
+# Ou dans le dashboard Streamlit Cloud : Settings > Secrets
+_expected_token = st.secrets.get("auth", {}).get("token", "")
 _provided_token = st.query_params.get("token", "")
-if _provided_token != _expected_token:
+if not _expected_token or _provided_token != _expected_token:
     st.error("Accès refusé")
     st.stop()
 
@@ -440,6 +445,7 @@ def generate_full_pdf(df, name, company, cur, uploaded_files, signature_b64=None
 
 # ─── Formulaire de saisie ─────────────────────────────────────────────────────
 st.markdown("## 📅 Ajoutez vos Dépenses")
+st.info("💡 Cliquez sur **« ✅ Ajouter Dépense »** pour valider chaque dépense, puis répétez pour chaque nouvelle dépense.")
 
 with st.form(key=f"expense_form_{st.session_state.form_key}"):
     col1, col2, col3 = st.columns(3)
