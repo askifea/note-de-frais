@@ -55,6 +55,10 @@ COMPANY_INFO = {
         "address":  "28 rue Petit – 92110 Clichy",
         "logo_b64": None,
     },
+    "IFEA Clichy (EDC)": {
+        "address":  "28 rue Petit – 92110 Clichy",
+        "logo_b64": _IFEA_LOGO_B64,
+    },
 }
 
 COMPANIES          = list(COMPANY_INFO.keys())
@@ -441,6 +445,7 @@ def generate_full_pdf(df, name, company, cur, uploaded_files, signature_b64=None
 
 # ─── Formulaire de saisie ─────────────────────────────────────────────────────
 st.markdown("## 📅 Ajoutez vos Dépenses")
+st.info("💡 Cliquez sur **« ✅ Ajouter Dépense »** pour valider chaque dépense, puis répétez pour chaque nouvelle dépense.")
 
 with st.form(key=f"expense_form_{st.session_state.form_key}"):
     col1, col2, col3 = st.columns(3)
