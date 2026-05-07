@@ -31,6 +31,10 @@ _SUGER_LOGO_B64 = "/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAA
 
 # ─── Données sociétés ─────────────────────────────────────────────────────────
 COMPANY_INFO = {
+    "IFEA Clichy (EDC)": {
+        "address":  "28 rue Petit – 92110 Clichy",
+        "logo_b64": _IFEA_LOGO_B64,
+    },
     "IFEA SAS": {
         "address":  "28 rue Petit – 92110 Clichy",
         "logo_b64": _IFEA_LOGO_B64,
@@ -54,10 +58,6 @@ COMPANY_INFO = {
     "Association LISA": {
         "address":  "28 rue Petit – 92110 Clichy",
         "logo_b64": None,
-    },
-    "IFEA Clichy (EDC)": {
-        "address":  "28 rue Petit – 92110 Clichy",
-        "logo_b64": _IFEA_LOGO_B64,
     },
 }
 
